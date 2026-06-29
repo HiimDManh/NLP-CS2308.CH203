@@ -1,1 +1,1 @@
-# Chuy-n-nghi-n-c-u-v-ng-d-ng-v-X-l-ng-n-ng-t-nhi-n---CS2308.CH203
+# Chuyên đề nghiên cứu và ứng dụng về Xử lý ngôn ngữ tự nhiên - CS2308.CH203
