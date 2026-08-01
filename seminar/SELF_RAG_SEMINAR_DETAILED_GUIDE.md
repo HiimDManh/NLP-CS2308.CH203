@@ -1260,6 +1260,64 @@ Có thể. Ý tưởng adaptive retrieval và self-critique không phụ thuộc
 
 Trong bài báo gốc, có fine-tune generator với dữ liệu chứa reflection tokens. Trong project nhỏ hoặc demo, có thể mô phỏng Self-RAG bằng prompt-based reflection thay vì fine-tune.
 
+### Câu 9. Vì sao RAG truyền thống không đủ nếu đã có retrieval?
+
+Vì retrieval chỉ cung cấp thêm tài liệu, nhưng không đảm bảo tài liệu đó liên quan, đầy đủ hoặc được model sử dụng đúng. RAG truyền thống thường retrieve top-k passages rồi đưa thẳng vào generator. Nếu passage nhiễu hoặc không liên quan, model có thể bị ảnh hưởng và tạo câu trả lời sai. Self-RAG thêm bước tự đánh giá relevance và support để kiểm soát vấn đề này.
+
+### Câu 10. Retrieve token có ý nghĩa gì trong thực tế?
+
+Retrieve token giúp model quyết định có cần gọi retriever hay không. Điều này quan trọng vì không phải mọi câu hỏi đều cần tài liệu ngoài. Ví dụ câu hỏi tính toán đơn giản hoặc kiến thức phổ thông có thể không cần retrieval, trong khi câu hỏi về nội dung paper hoặc sự kiện cụ thể thì cần retrieval.
+
+### Câu 11. ISREL khác ISSUP ở điểm nào?
+
+ISREL đánh giá **passage có liên quan với câu hỏi hay không**. ISSUP đánh giá **câu trả lời có được passage hỗ trợ hay không**. Một passage có thể relevant nhưng câu trả lời vẫn có thể không fully supported nếu model thêm thông tin ngoài evidence.
+
+Ví dụ:
+
+```text
+Question: What are reflection tokens?
+Passage: The passage lists Retrieve, IsREL, IsSUP, IsUSE.
+Answer: Self-RAG also uses a memory token for long-term storage.
+```
+
+Passage có thể relevant, nhưng phần "memory token" không được support.
+
+### Câu 12. ISUSE có cần thiết không nếu đã có ISSUP?
+
+Có. ISSUP kiểm tra câu trả lời có được evidence hỗ trợ không, còn ISUSE đánh giá câu trả lời có hữu ích với người dùng không. Một câu trả lời có thể đúng và supported nhưng quá ngắn, thiếu giải thích hoặc không trả lời đủ ý. ISUSE bổ sung góc nhìn về chất lượng sử dụng.
+
+### Câu 13. Self-RAG có thể retrieve nhiều lần không?
+
+Theo inference trong paper, retrieval có thể được kích hoạt trong quá trình generation, đặc biệt khi model cần thêm evidence cho các đoạn sinh tiếp theo. Đây là lý do Self-RAG phù hợp với long-form generation, nơi một câu trả lời dài có thể cần nhiều evidence khác nhau.
+
+### Câu 14. Vì sao bài báo cần cả short-form và long-form generation?
+
+Short-form tasks như QA hoặc fact verification kiểm tra khả năng trả lời chính xác ngắn gọn. Long-form generation kiểm tra khả năng duy trì factuality trong câu trả lời dài, nơi hallucination dễ xảy ra hơn. Việc đánh giá cả hai giúp paper chứng minh Self-RAG hữu ích trong nhiều bối cảnh.
+
+### Câu 15. Nếu model tự sinh reflection tokens, có thể xem đó là một dạng giải thích được không?
+
+Có thể xem là một dạng tín hiệu giải thích ở mức pipeline, vì người dùng hoặc hệ thống có thể thấy model quyết định retrieve hay không, passage nào relevant, answer có supported không. Tuy nhiên, đây không phải explanation đầy đủ như human reasoning; nó vẫn là output của model và có thể sai.
+
+### Câu 16. Self-RAG có làm model chậm hơn không?
+
+Có thể. Vì ngoài sinh câu trả lời, hệ thống còn có thể retrieve, đánh giá passage và sinh critique tokens. Tuy nhiên, nếu adaptive retrieval tránh được retrieval không cần thiết thì trong một số trường hợp chi phí có thể được kiểm soát tốt hơn RAG luôn retrieve.
+
+### Câu 17. Điểm mới nhất của Self-RAG so với các hệ RAG + reranker là gì?
+
+Reranker chủ yếu xếp hạng lại tài liệu trước generation. Self-RAG không chỉ xếp hạng tài liệu, mà còn đưa quyết định retrieve, đánh giá relevance, support và usefulness vào quá trình generation. Điểm mới là integration giữa retrieval, generation và critique.
+
+### Câu 18. Có thể dùng Self-RAG trong hệ thống chatbot tài liệu nội bộ không?
+
+Có thể. Đây là ứng dụng phù hợp vì chatbot tài liệu cần trả lời dựa trên evidence. Tuy nhiên, cần có retriever tốt, corpus sạch, cơ chế citation rõ, và chính sách từ chối trả lời khi evidence không đủ.
+
+### Câu 19. Nếu evidence bị mâu thuẫn thì Self-RAG xử lý thế nào?
+
+Paper tập trung nhiều vào relevance/support/usefulness, nhưng trong hệ thống thực tế có thể cần thêm cơ chế conflict detection. Nếu hai passage mâu thuẫn, model nên báo rằng sources không thống nhất hoặc cần evidence bổ sung, thay vì tự chọn một câu trả lời chắc chắn.
+
+### Câu 20. Có nên đưa Self-RAG vào project cuối kì không?
+
+Có, nhưng nên làm phiên bản vừa sức: Self-RAG-inspired. Thay vì fine-tune model như paper, có thể dùng prompt để mô phỏng Retrieve, ISREL, ISSUP và ISUSE, sau đó so sánh với RAG baseline trên một tập câu hỏi nhỏ.
+
 ---
 
 ## 12. Các điểm dễ bị hỏi khó
@@ -1293,6 +1351,56 @@ Self-RAG khác ở chỗ reflection tokens được tích hợp vào quá trình
 ```text
 Mô hình có thể sinh [Retrieve] = No và trả lời trực tiếp.
 Đây là điểm adaptive: retrieval không còn là bước bắt buộc cho mọi input.
+```
+
+### 12.5. "Nếu reflection token sai thì hệ thống có cơ chế sửa không?"
+
+```text
+Trong paper, reflection tokens giúp model tự kiểm soát generation, nhưng không đảm bảo đúng tuyệt đối.
+Một hướng cải tiến là thêm threshold, external verifier, hoặc human evaluation để kiểm tra lại các quyết định quan trọng.
+Vì vậy khi triển khai thực tế, reflection nên được xem là tín hiệu hỗ trợ, không phải bảo chứng tuyệt đối.
+```
+
+### 12.6. "Self-RAG có thể bị over-retrieve không?"
+
+```text
+Có thể.
+Nếu model thường xuyên chọn retrieve, hệ thống sẽ tốn chi phí và có nguy cơ đưa thêm noise vào context.
+Do đó cần điều chỉnh retrieval threshold hoặc retrieval frequency.
+Paper cũng nhấn mạnh khả năng điều khiển retrieval behavior thông qua reflection tokens trong inference.
+```
+
+### 12.7. "Tại sao không retrieve toàn bộ tài liệu để chắc chắn không thiếu evidence?"
+
+```text
+Retrieve quá nhiều làm context dài, tăng chi phí và có thể gây nhiễu.
+LLM không phải lúc nào cũng dùng tốt context rất dài.
+Mục tiêu của Self-RAG là retrieve đúng lúc và dùng evidence có chọn lọc, thay vì đưa càng nhiều tài liệu càng tốt.
+```
+
+### 12.8. "Self-RAG có phụ thuộc vào mô hình nền không?"
+
+```text
+Có.
+Generator cần đủ năng lực để học reflection tokens và sinh câu trả lời tốt.
+Nếu mô hình nền quá yếu, nó có thể đánh giá relevance/support sai hoặc generate kém dù có retrieval.
+Vì vậy hiệu quả Self-RAG phụ thuộc vào cả retriever, data và base LM.
+```
+
+### 12.9. "Self-RAG có phù hợp cho real-time applications không?"
+
+```text
+Tùy yêu cầu latency.
+Self-RAG có thể chậm hơn RAG đơn giản vì thêm retrieval decision và critique.
+Với ứng dụng real-time, cần tối ưu bằng caching, model nhỏ cho critic, giới hạn top-k, hoặc chỉ bật self-critique cho câu hỏi rủi ro cao.
+```
+
+### 12.10. "Đâu là điểm có thể phát triển thành project cuối kì?"
+
+```text
+Một hướng khả thi là xây dựng Self-RAG-inspired QA system trên tài liệu tiếng Việt hoặc tài liệu môn học.
+Hệ thống có baseline RAG, sau đó thêm các bước Retrieve decision, relevance judge, support judge và usefulness judge.
+Cuối cùng so sánh hai hệ bằng accuracy, support score và hallucination rate.
 ```
 
 ---
