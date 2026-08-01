@@ -65,7 +65,7 @@ Flow nên đi từ dễ đến khó:
 
 Nếu seminar dài **20 phút**, nên dùng khoảng **18 slide**.
 
-Nếu seminar dài **30 phút**, nên dùng khoảng **24 slide**.
+Nếu seminar dài **30 phút**, nên dùng khoảng **25-26 slide** nếu tính cả slide Q&A.
 
 Nếu seminar dài **45 phút**, có thể dùng **28-32 slide**, thêm nhiều ví dụ và phân tích thí nghiệm hơn.
 
@@ -195,7 +195,66 @@ Hôm nay em sẽ trình bày bài báo Self-RAG: Learning to Retrieve, Generate,
 
 ---
 
-## Slide 2. Motivation: Vì sao chủ đề này quan trọng?
+## Slide 2. Thông tin bài báo
+
+### Mục tiêu
+
+Giới thiệu nhanh metadata của paper để người nghe biết đây là công trình nào, của nhóm tác giả nào, được công bố ở đâu và có vị trí học thuật ra sao.
+
+### Nội dung nên có
+
+```text
+Paper:
+Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection
+
+Authors:
+Akari Asai, Zeqiu Wu, Yizhong Wang, Avirup Sil, Hannaneh Hajishirzi
+
+Affiliations:
+University of Washington, Allen Institute for AI, IBM Research AI
+
+Venue:
+ICLR 2024 - The Twelfth International Conference on Learning Representations
+
+Type:
+Conference paper
+```
+
+Có thể thêm một dòng ngắn:
+
+```text
+Core idea: Train a language model to retrieve, generate, and critique through reflection tokens.
+```
+
+### Gợi ý hình ảnh/sơ đồ
+
+- Bố cục dạng "paper card": title ở trên, bên dưới là authors, affiliations, venue.
+- Có thể đặt logo/nhãn nhỏ: `ICLR 2024`.
+- Nếu không dùng logo, chỉ cần một badge chữ: `Published at ICLR 2024`.
+
+### Script nói gợi ý
+
+```text
+Trước khi đi vào nội dung, em giới thiệu nhanh về bài báo. 
+Bài Self-RAG có tên đầy đủ là Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection.
+Nhóm tác giả gồm Akari Asai, Zeqiu Wu, Yizhong Wang, Avirup Sil và Hannaneh Hajishirzi,
+đến từ University of Washington, Allen Institute for AI và IBM Research AI.
+Bài báo được công bố tại ICLR 2024, tức The Twelfth International Conference on Learning Representations.
+Về ý tưởng chính, bài báo đề xuất huấn luyện language model để vừa retrieve, vừa generate, vừa critique thông qua reflection tokens.
+```
+
+### Dẫn chứng từ paper
+
+- Trang đầu bản conference paper ghi: `Published as a conference paper at ICLR 2024`.
+- Trang đầu cũng liệt kê authors và affiliations:
+  - Akari Asai, Zeqiu Wu, Yizhong Wang, Hannaneh Hajishirzi: University of Washington.
+  - Yizhong Wang và Hannaneh Hajishirzi cũng thuộc Allen Institute for AI.
+  - Avirup Sil: IBM Research AI.
+- Citation nên ghi trên slide: `Source: Asai et al., 2024, ICLR conference paper`.
+
+---
+
+## Slide 3. Motivation: Vì sao chủ đề này quan trọng?
 
 ### Mục tiêu
 
@@ -219,7 +278,7 @@ Vì vậy, một hướng nghiên cứu quan trọng là làm sao để mô hìn
 
 ---
 
-## Slide 3. Hallucination trong LLM
+## Slide 4. Hallucination trong LLM
 
 ### Mục tiêu
 
@@ -253,7 +312,7 @@ Vì LLM sinh token dựa trên xác suất, nó không mặc định có cơ ch�
 
 ---
 
-## Slide 4. Retrieval-Augmented Generation
+## Slide 5. Retrieval-Augmented Generation
 
 ### Mục tiêu
 
@@ -289,7 +348,7 @@ Về ý tưởng, RAG giúp mô hình có thêm bằng chứng trước khi tr�
 
 ---
 
-## Slide 5. Hạn chế của RAG truyền thống
+## Slide 6. Hạn chế của RAG truyền thống
 
 ### Mục tiêu
 
@@ -333,7 +392,7 @@ Thứ hai, nếu tài liệu retrieve không liên quan, generator có thể b�
 
 ---
 
-## Slide 6. Research Question
+## Slide 7. Research Question
 
 ### Mục tiêu
 
@@ -361,7 +420,7 @@ và tự kiểm tra câu trả lời của chính nó hay không?
 
 ---
 
-## Slide 7. Self-RAG Overview
+## Slide 8. Self-RAG Overview
 
 ### Mục tiêu
 
@@ -400,7 +459,7 @@ Nhờ vậy, mô hình có thể kiểm soát tốt hơn quá trình trả lời
 
 ---
 
-## Slide 8. Ý tưởng cốt lõi: Reflection Tokens
+## Slide 9. Ý tưởng cốt lõi: Reflection Tokens
 
 ### Mục tiêu
 
@@ -439,7 +498,7 @@ câu trả lời có được hỗ trợ không, và câu trả lời có hữu 
 
 ---
 
-## Slide 9. Retrieve Token
+## Slide 10. Retrieve Token
 
 ### Mục tiêu
 
@@ -478,7 +537,7 @@ Nếu câu hỏi cần bằng chứng từ tài liệu ngoài, mô hình chọn 
 
 ---
 
-## Slide 10. ISREL Token
+## Slide 11. ISREL Token
 
 ### Mục tiêu
 
@@ -507,7 +566,7 @@ Nếu passage không liên quan, mô hình có thể giảm ảnh hưởng hoặ
 
 ---
 
-## Slide 11. ISSUP Token
+## Slide 12. ISSUP Token
 
 ### Mục tiêu
 
@@ -535,7 +594,7 @@ Token này giúp Self-RAG kiểm tra xem output có grounded trong passage đư�
 
 ---
 
-## Slide 12. ISUSE Token
+## Slide 13. ISUSE Token
 
 ### Mục tiêu
 
@@ -564,7 +623,7 @@ Vì vậy Self-RAG không chỉ kiểm tra đúng sai, mà còn kiểm tra usefu
 
 ---
 
-## Slide 13. Bảng tổng hợp Reflection Tokens
+## Slide 14. Bảng tổng hợp Reflection Tokens
 
 ### Mục tiêu
 
@@ -609,7 +668,7 @@ Lưu ý khi làm slide:
 
 ---
 
-## Slide 14. Training Pipeline Overview
+## Slide 15. Training Pipeline Overview
 
 ### Mục tiêu
 
@@ -651,7 +710,7 @@ Generator cuối cùng được fine-tune trên dữ liệu đã có reflection 
 
 ---
 
-## Slide 15. Critic Model
+## Slide 16. Critic Model
 
 ### Mục tiêu
 
@@ -686,7 +745,7 @@ Nhờ critic, generator học được khi nào cần retrieve và cách tự đ
 
 ---
 
-## Slide 16. Generator Model
+## Slide 17. Generator Model
 
 ### Mục tiêu
 
@@ -716,7 +775,7 @@ Nói cách khác, critic giúp dạy generator trong training, còn generator l�
 
 ---
 
-## Slide 17. Inference Pipeline
+## Slide 18. Inference Pipeline
 
 ### Mục tiêu
 
@@ -753,7 +812,7 @@ Như vậy, inference của Self-RAG là một quá trình generate có kiểm s
 
 ---
 
-## Slide 18. Example Walkthrough
+## Slide 19. Example Walkthrough
 
 ### Mục tiêu
 
@@ -794,7 +853,7 @@ Cuối cùng, nó đánh giá câu trả lời được hỗ trợ đầy đủ 
 
 ---
 
-## Slide 19. Experiments
+## Slide 20. Experiments
 
 ### Mục tiêu
 
@@ -833,7 +892,7 @@ Tác giả so sánh với các mô hình ngôn ngữ thông thường, các base
 
 ---
 
-## Slide 20. Main Results
+## Slide 21. Main Results
 
 ### Mục tiêu
 
@@ -869,7 +928,7 @@ Across the evaluated tasks in the paper, Self-RAG shows consistent improvements 
 
 ---
 
-## Slide 21. Why Self-RAG Works
+## Slide 22. Why Self-RAG Works
 
 ### Mục tiêu
 
@@ -897,7 +956,7 @@ Nói ngắn gọn, Self-RAG không chỉ thêm tài liệu vào prompt, mà còn
 
 ---
 
-## Slide 22. Limitations
+## Slide 23. Limitations
 
 ### Mục tiêu
 
@@ -931,7 +990,7 @@ Vì vậy Self-RAG nên được hiểu là một bước tiến trong việc gi
 
 ---
 
-## Slide 23. Discussion
+## Slide 24. Discussion
 
 ### Mục tiêu
 
@@ -956,7 +1015,7 @@ Từ góc nhìn NLP, Self-RAG nằm ở giao điểm giữa Information Retrieva
 
 ---
 
-## Slide 24. Conclusion
+## Slide 25. Conclusion
 
 ### Mục tiêu
 
@@ -984,7 +1043,7 @@ Thay vì luôn retrieve rồi generate, mô hình học cách quyết định kh
 
 ---
 
-## Slide 25. Q&A
+## Slide 26. Q&A
 
 ### Mục tiêu
 
@@ -1243,6 +1302,7 @@ Mô hình có thể sinh [Retrieve] = No và trả lời trực tiếp.
 Slide nên có:
 
 - [ ] Title rõ ràng.
+- [ ] Slide thông tin bài báo: tác giả, affiliation, hội nghị, loại bài.
 - [ ] Motivation về hallucination.
 - [ ] Pipeline RAG truyền thống.
 - [ ] Hạn chế của RAG truyền thống.

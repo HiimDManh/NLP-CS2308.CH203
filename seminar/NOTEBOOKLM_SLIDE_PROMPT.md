@@ -28,7 +28,7 @@ Yêu cầu quan trọng:
 - Tập trung làm rõ: motivation, hạn chế của RAG truyền thống, ý tưởng Self-RAG, reflection tokens, critic model, generator model, inference, experiments, results, limitations, critical assessment, future improvements.
 - Slide cần phục vụ thuyết trình seminar, không phải báo cáo văn bản dài.
 
-Hãy tạo một bộ slide khoảng 24 slide cho bài seminar 25-30 phút.
+Hãy tạo một bộ slide khoảng 25-26 slide cho bài seminar 25-30 phút, tính cả slide Q&A.
 
 Với mỗi slide, hãy trình bày theo đúng format sau:
 
@@ -58,29 +58,39 @@ Dẫn chứng từ paper:
 
 Luồng slide mong muốn:
 1. Title
-2. Motivation: LLM và hallucination
-3. Vì sao cần Retrieval-Augmented Generation
-4. RAG truyền thống hoạt động như thế nào
-5. Hạn chế của RAG truyền thống
-6. Research question của Self-RAG
-7. Tổng quan Self-RAG
-8. Reflection tokens là gì
-9. Retrieve token
-10. ISREL token
-11. ISSUP token
-12. ISUSE token
-13. Bảng tổng hợp reflection tokens
-14. Training pipeline tổng quan
-15. Critic model
-16. Generator model
-17. Inference pipeline
-18. Example walkthrough
-19. Experimental setup
-20. Main results
-21. Why Self-RAG works
-22. Limitations
-23. Critical assessment
-24. Future improvements và conclusion
+2. Thông tin bài báo: title, authors, affiliations, venue, publication type
+3. Motivation: LLM và hallucination
+4. Vì sao cần Retrieval-Augmented Generation
+5. RAG truyền thống hoạt động như thế nào
+6. Hạn chế của RAG truyền thống
+7. Research question của Self-RAG
+8. Tổng quan Self-RAG
+9. Reflection tokens là gì
+10. Retrieve token
+11. ISREL token
+12. ISSUP token
+13. ISUSE token
+14. Bảng tổng hợp reflection tokens
+15. Training pipeline tổng quan
+16. Critic model
+17. Generator model
+18. Inference pipeline
+19. Example walkthrough
+20. Experimental setup
+21. Main results
+22. Why Self-RAG works
+23. Limitations
+24. Critical assessment
+25. Future improvements và conclusion
+26. Q&A
+
+Yêu cầu riêng cho slide 2 - Thông tin bài báo:
+- Ghi đúng tên paper: Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection.
+- Ghi đúng tác giả: Akari Asai, Zeqiu Wu, Yizhong Wang, Avirup Sil, Hannaneh Hajishirzi.
+- Ghi affiliations: University of Washington, Allen Institute for AI, IBM Research AI.
+- Ghi venue: ICLR 2024 - The Twelfth International Conference on Learning Representations.
+- Ghi publication type: Conference paper.
+- Citation: trang đầu của bản conference paper ghi "Published as a conference paper at ICLR 2024".
 
 Yêu cầu riêng cho phần Critical Assessment:
 - Đánh giá điểm mạnh của bài báo.
@@ -91,7 +101,7 @@ Yêu cầu riêng cho phần Future Improvements:
 - Đề xuất các hướng cải tiến có cơ sở, không phóng đại.
 - Có thể gồm: stronger retriever/reranker, calibrated reflection scores, independent critic, claim-level citation grounding, áp dụng cho tiếng Việt, efficient Self-RAG.
 
-Sau khi tạo outline 24 slide, hãy tạo thêm:
+Sau khi tạo outline 25-26 slide, hãy tạo thêm:
 1. Một bảng tóm tắt toàn bộ slide gồm: số slide, tiêu đề, mục tiêu, nguồn paper liên quan.
 2. Một checklist những slide bắt buộc phải có citation.
 3. Một script mở đầu 1 phút.
@@ -110,7 +120,7 @@ Lưu ý:
 ## Prompt rút gọn nếu NotebookLM trả lời quá dài
 
 ```text
-Hãy tạo outline 24 slide tiếng Việt cho seminar về bài báo Self-RAG dựa trên các nguồn tôi đã upload.
+Hãy tạo outline 25-26 slide tiếng Việt cho seminar về bài báo Self-RAG dựa trên các nguồn tôi đã upload.
 
 Với mỗi slide, hãy cung cấp:
 1. Tiêu đề.
@@ -120,7 +130,7 @@ Với mỗi slide, hãy cung cấp:
 5. Dẫn chứng từ paper: Abstract/Section/Table/Algorithm tương ứng.
 
 Luồng slide:
-Title, Motivation, Hallucination, RAG, hạn chế RAG, research question, Self-RAG overview, reflection tokens, Retrieve, ISREL, ISSUP, ISUSE, training, critic, generator, inference, example, experiments, results, why it works, limitations, critical assessment, future improvements, conclusion.
+Title, thông tin bài báo, Motivation, Hallucination, RAG, hạn chế RAG, research question, Self-RAG overview, reflection tokens, Retrieve, ISREL, ISSUP, ISUSE, training, critic, generator, inference, example, experiments, results, why it works, limitations, critical assessment, future improvements, conclusion, Q&A.
 
 Yêu cầu:
 - Bám sát paper Self-RAG.
@@ -142,11 +152,12 @@ Dựa trên paper Self-RAG và file seminar guide, hãy tạo nội dung slide 1
 
 Các slide gồm:
 1. Title
-2. Motivation: LLM và hallucination
-3. Hallucination trong LLM
-4. Retrieval-Augmented Generation
-5. Hạn chế của RAG truyền thống
-6. Research question của Self-RAG
+2. Thông tin bài báo: authors, affiliations, venue, publication type
+3. Motivation: LLM và hallucination
+4. Hallucination trong LLM
+5. Retrieval-Augmented Generation
+6. Hạn chế của RAG truyền thống
+7. Research question của Self-RAG
 
 Với mỗi slide, hãy có: nội dung slide, speaker notes, gợi ý hình minh họa, dẫn chứng từ paper.
 ```
@@ -154,21 +165,21 @@ Với mỗi slide, hãy có: nội dung slide, speaker notes, gợi ý hình min
 ### 2. Prompt cho phần phương pháp
 
 ```text
-Dựa trên paper Self-RAG và file seminar guide, hãy tạo nội dung slide 7-18 cho phần phương pháp.
+Dựa trên paper Self-RAG và file seminar guide, hãy tạo nội dung slide 8-19 cho phần phương pháp.
 
 Các slide gồm:
-7. Self-RAG overview
-8. Reflection tokens
-9. Retrieve token
-10. ISREL token
-11. ISSUP token
-12. ISUSE token
-13. Bảng tổng hợp reflection tokens
-14. Training pipeline
-15. Critic model
-16. Generator model
-17. Inference pipeline
-18. Example walkthrough
+8. Self-RAG overview
+9. Reflection tokens
+10. Retrieve token
+11. ISREL token
+12. ISSUP token
+13. ISUSE token
+14. Bảng tổng hợp reflection tokens
+15. Training pipeline
+16. Critic model
+17. Generator model
+18. Inference pipeline
+19. Example walkthrough
 
 Yêu cầu:
 - Bám sát Section 3, Table 1 và Algorithm 1 của paper.
@@ -180,15 +191,16 @@ Yêu cầu:
 ### 3. Prompt cho phần kết quả và đánh giá
 
 ```text
-Dựa trên paper Self-RAG và file seminar guide, hãy tạo nội dung slide 19-24 cho phần results, đánh giá và kết luận.
+Dựa trên paper Self-RAG và file seminar guide, hãy tạo nội dung slide 20-26 cho phần results, đánh giá và kết luận.
 
 Các slide gồm:
-19. Experimental setup
-20. Main results
-21. Why Self-RAG works
-22. Limitations
-23. Critical assessment
-24. Future improvements and conclusion
+20. Experimental setup
+21. Main results
+22. Why Self-RAG works
+23. Limitations
+24. Discussion
+25. Critical assessment / Future improvements / Conclusion
+26. Q&A
 
 Yêu cầu:
 - Bám sát Section 4, Section 5 và Ethical Concerns của paper.
@@ -220,4 +232,3 @@ Kiểm tra các tiêu chí:
 
 Hãy chỉ ra các slide cần sửa và đề xuất phiên bản tốt hơn.
 ```
-
