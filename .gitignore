@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated RAG artifacts (FAISS index, embeddings, eval outputs) - reproducible from notebooks
+final/artifacts/
+
+# VLSP2025 DRiLL dataset json files exceed GitHub's 100MB hard push limit
+# (legal_corpus.json ~117MB, legal_dataset.json ~134MB) - kept on Google Drive / local
+# disk only, never committed. readme.md (schema doc) stays tracked.
+final/dataset/VLQA/*.json

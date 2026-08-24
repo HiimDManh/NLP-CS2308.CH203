@@ -1758,6 +1758,208 @@ Trong triển khai thực tế, câu hỏi không chỉ là Self-RAG có chính 
 mà còn là nó có đủ nhanh và đủ rẻ để dùng trong hệ thống thật hay không.
 ```
 
+### 20.7. Query rewriting trước khi retrieval
+
+Một điểm có thể cải tiến là thêm bước viết lại câu hỏi trước khi truy xuất. Trong thực tế, câu hỏi người dùng có thể mơ hồ, quá ngắn hoặc dùng từ không khớp với tài liệu.
+
+Ví dụ:
+
+```text
+Original question:
+How does it critique?
+
+Rewritten query:
+How does Self-RAG use reflection tokens to critique retrieved passages and generated answers?
+```
+
+Lợi ích:
+
+- Tăng khả năng retriever lấy đúng evidence.
+- Giảm trường hợp passage retrieve không liên quan.
+- Hữu ích với câu hỏi hội thoại có đại từ như "nó", "phương pháp này", "paper này".
+
+Trade-off:
+
+- Thêm một bước inference.
+- Query rewrite sai có thể làm lệch ý định câu hỏi ban đầu.
+
+### 20.8. Conflict-aware Self-RAG
+
+Self-RAG đánh giá relevance và support, nhưng trong thực tế retrieved passages có thể mâu thuẫn nhau.
+
+Hướng mở rộng:
+
+- Thêm token hoặc module đánh giá conflict:
+
+```text
+[ISCONFLICT] = Conflict / No conflict / Unclear
+```
+
+- Nếu evidence mâu thuẫn, hệ thống không nên trả lời chắc chắn.
+- Output nên báo: "Các nguồn truy xuất chưa thống nhất" hoặc "Cần thêm evidence".
+
+Ứng dụng:
+
+- News QA.
+- Medical QA.
+- Legal document QA.
+- Scientific literature review.
+
+Câu nói gợi ý:
+
+```text
+Một cải tiến quan trọng là làm cho Self-RAG không chỉ biết evidence có support answer hay không,
+mà còn biết các evidence có mâu thuẫn với nhau hay không.
+```
+
+### 20.9. Abstention mechanism: biết khi nào không nên trả lời
+
+Trong các hệ thống cần độ tin cậy cao, trả lời "không đủ bằng chứng" đôi khi tốt hơn trả lời sai.
+
+Hướng cải tiến:
+
+- Nếu `ISSUP = No support`, hệ thống từ chối trả lời.
+- Nếu relevance của retrieved passages thấp, hệ thống yêu cầu thêm thông tin.
+- Nếu support score thấp hơn threshold, hệ thống trả lời kèm cảnh báo.
+
+Ví dụ output:
+
+```text
+I do not have enough evidence in the retrieved documents to answer this question reliably.
+```
+
+Ý nghĩa:
+
+- Giảm hallucination.
+- Tăng độ an toàn.
+- Phù hợp với ứng dụng y tế, pháp lý, giáo dục.
+
+### 20.10. Human-in-the-loop Self-RAG
+
+Một hướng mở rộng là cho con người tham gia vào các điểm quan trọng:
+
+- Xác nhận passage có relevant không.
+- Sửa câu trả lời chưa được support.
+- Annotate thêm reflection tokens cho domain-specific data.
+- Đánh giá lại các case model không chắc chắn.
+
+Lợi ích:
+
+- Tạo dữ liệu chất lượng hơn.
+- Cải thiện model theo từng domain.
+- Giúp hệ thống đáng tin hơn khi dùng trong môi trường thật.
+
+Trade-off:
+
+- Tốn công sức annotation.
+- Khó mở rộng nếu số lượng câu hỏi lớn.
+
+### 20.11. Domain-specific Self-RAG
+
+Self-RAG có thể được mở rộng cho từng lĩnh vực chuyên biệt:
+
+- Medical Self-RAG.
+- Legal Self-RAG.
+- Scientific-paper Self-RAG.
+- Education QA Self-RAG.
+- Vietnamese administrative document QA.
+
+Với từng domain, cần điều chỉnh:
+
+- Corpus.
+- Retriever.
+- Reflection criteria.
+- Evaluation dataset.
+- Chính sách từ chối trả lời.
+
+Ví dụ với tài liệu khoa học:
+
+```text
+Reflection không chỉ hỏi answer có supported không,
+mà còn có thể hỏi claim có đúng với methodology/result của paper không.
+```
+
+### 20.12. Learning better reflection tokens
+
+Trong paper, reflection tokens được thiết kế trước. Một hướng nghiên cứu sâu hơn là để model học hoặc mở rộng bộ reflection tokens.
+
+Các token có thể bổ sung:
+
+| Token đề xuất | Ý nghĩa |
+|---|---|
+| ISCONFLICT | Evidence có mâu thuẫn không |
+| ISCOMPLETE | Answer đã đủ ý chưa |
+| ISCURRENT | Evidence có còn cập nhật không |
+| ISDOMAIN | Evidence có đúng domain không |
+| ISUNCERTAIN | Model có đang không chắc chắn không |
+
+Câu nói gợi ý:
+
+```text
+Reflection tokens hiện tại đã bao phủ relevance, support và usefulness,
+nhưng các hệ thống thực tế có thể cần thêm tiêu chí như conflict, completeness hoặc uncertainty.
+```
+
+### 20.13. Combining Self-RAG with long-context LLMs
+
+Khi long-context LLM ngày càng mạnh, một câu hỏi tự nhiên là liệu còn cần retrieval không.
+
+Góc nhìn cân bằng:
+
+- Long-context giúp đưa nhiều tài liệu vào prompt.
+- Nhưng nhiều context không đồng nghĩa với dùng evidence chính xác.
+- Self-RAG vẫn hữu ích vì nó đánh giá evidence và answer.
+
+Hướng cải tiến:
+
+- Dùng long-context để chứa nhiều candidate passages.
+- Dùng reflection tokens để chọn và kiểm tra evidence.
+- Kết hợp retrieval với context compression.
+
+### 20.14. Evaluation mở rộng
+
+Một hướng cải tiến quan trọng là đánh giá Self-RAG sâu hơn.
+
+Metrics có thể thêm:
+
+- Retrieval decision accuracy.
+- Passage relevance precision.
+- Support correctness.
+- Citation faithfulness.
+- Abstention accuracy.
+- Latency/cost.
+- Human trust rating.
+
+Ví dụ bảng đánh giá:
+
+| Metric | Ý nghĩa |
+|---|---|
+| Retrieval decision accuracy | Model có retrieve đúng lúc không |
+| Support correctness | Self-critique support có đúng không |
+| Citation faithfulness | Citation có thật sự support claim không |
+| Abstention accuracy | Model có biết từ chối khi thiếu evidence không |
+| Latency | Chi phí thời gian khi thêm reflection |
+
+### 20.15. Hướng mở rộng phù hợp để nói trong seminar
+
+Nếu chỉ có 1 slide Future Improvements, nên chọn 5 ý mạnh nhất:
+
+```text
+1. Stronger retriever + reranker
+2. Calibrated reflection scores
+3. Abstention when evidence is insufficient
+4. Conflict-aware evidence checking
+5. Vietnamese/domain-specific Self-RAG
+```
+
+Nếu có thời gian nói thêm, có thể thêm:
+
+```text
+6. Human-in-the-loop annotation
+7. Claim-level citation grounding
+8. Efficient inference
+```
+
 ---
 
 ## 21. Slide đánh giá bài báo nên trình bày như thế nào?
@@ -1793,6 +1995,8 @@ Possible Improvements
 - Independent or multi-stage critics
 - Claim-level citation grounding
 - Vietnamese/domain-specific Self-RAG
+- Abstention when evidence is insufficient
+- Conflict-aware evidence checking
 - More efficient inference
 ```
 
@@ -1802,6 +2006,7 @@ Script nói gợi ý:
 Về tổng thể, Self-RAG là một đóng góp mạnh vì nó đưa critique vào quá trình generation.
 Tuy nhiên, phương pháp vẫn phụ thuộc vào chất lượng retrieval và độ tin cậy của self-critique.
 Trong tương lai, có thể cải tiến bằng retriever tốt hơn, calibration cho reflection scores,
+cơ chế từ chối trả lời khi thiếu evidence, kiểm tra evidence mâu thuẫn,
 hoặc áp dụng vào các miền/ngôn ngữ cụ thể như hỏi đáp tài liệu tiếng Việt.
 ```
 

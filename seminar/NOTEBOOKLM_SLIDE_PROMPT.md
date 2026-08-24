@@ -99,14 +99,14 @@ Yêu cầu riêng cho phần Critical Assessment:
 
 Yêu cầu riêng cho phần Future Improvements:
 - Đề xuất các hướng cải tiến có cơ sở, không phóng đại.
-- Có thể gồm: stronger retriever/reranker, calibrated reflection scores, independent critic, claim-level citation grounding, áp dụng cho tiếng Việt, efficient Self-RAG.
+- Có thể gồm: stronger retriever/reranker, calibrated reflection scores, independent critic, claim-level citation grounding, abstention when evidence is insufficient, conflict-aware evidence checking, query rewriting, áp dụng cho tiếng Việt, efficient Self-RAG.
 
 Sau khi tạo outline 25-26 slide, hãy tạo thêm:
 1. Một bảng tóm tắt toàn bộ slide gồm: số slide, tiêu đề, mục tiêu, nguồn paper liên quan.
 2. Một checklist những slide bắt buộc phải có citation.
 3. Một script mở đầu 1 phút.
 4. Một script kết luận 1 phút.
-5. 8 câu hỏi Q&A có thể bị hỏi, kèm câu trả lời ngắn.
+5. 15-20 câu hỏi Q&A có thể bị hỏi, kèm câu trả lời ngắn; chia theo nhóm background, method, experiments, limitations, future work.
 
 Lưu ý:
 - Toàn bộ output bằng tiếng Việt.
@@ -136,7 +136,7 @@ Yêu cầu:
 - Bám sát paper Self-RAG.
 - Không bịa số liệu.
 - Có dẫn chứng từ paper cho claim quan trọng.
-- Cuối cùng tạo thêm 8 câu Q&A.
+- Cuối cùng tạo thêm 15-20 câu Q&A, chia theo nhóm background, method, experiments, limitations, future work.
 ```
 
 ---
