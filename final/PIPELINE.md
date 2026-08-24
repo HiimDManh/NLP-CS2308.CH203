@@ -96,35 +96,42 @@ GPU trên Colab (nếu có) chỉ dùng cho bước embedding corpus (`01_retrie
 
 ## 6. Hướng dẫn chạy trên Google Colab
 
-### 6.1. Đưa repo + dataset lên Colab
+### 6.1. Đưa code + dataset lên Colab
 
-Dataset (`legal_corpus.json` ~117MB, `legal_dataset.json` ~134MB) **không nằm trong git** — vượt giới hạn 100MB/file của GitHub, và đã được thêm vào `.gitignore` (`final/dataset/VLQA/*.json`). Vì vậy cần 2 bước tách biệt: clone code bằng git, rồi upload dataset lên Drive thủ công **một lần duy nhất** (Drive giữ nguyên giữa các phiên Colab nên không phải lặp lại).
+**Quan trọng: không `git clone`/`git pull` vào thư mục Google Drive đã mount trong Colab.** Đã thử và gặp lỗi thật: Google Drive mount trong Colab dùng FUSE, không tương thích với cách git ghi file pack tạm khi giải nén object — lỗi điển hình:
 
-**Bước 1 — clone code (nhanh, không dính giới hạn size vì dataset đã bị loại khỏi git):**
+```text
+fatal: could not open '/content/drive/MyDrive/.../.git/objects/pack/tmp_pack_XXXXXX' for reading: No such file or directory
+fatal: fetch-pack: invalid index-pack output
+```
+
+Đây là giới hạn đã biết của Drive FUSE, không phải do dataset hay do file `.gitignore` — kể cả clone một repo nhỏ (như lúc chỉ có 20MB code) cũng có thể lỗi. Cách né hoàn toàn vấn đề này: **không git-clone trong Colab nữa** — tách riêng code (lấy thẳng từ GitHub, không qua Drive) và dữ liệu (Drive, không qua git):
+
+**Code — mở notebook trực tiếp từ GitHub, không clone:**
+
+Colab đọc thẳng notebook từ GitHub qua URL, không cần git:
+
+```text
+https://colab.research.google.com/github/HiimDManh/NLP-CS2308.CH203/blob/main/final/notebooks/01_retrieval_baseline.ipynb
+```
+
+Hoặc trong Colab: `File > Open notebook > GitHub tab` → nhập `HiimDManh/NLP-CS2308.CH203` → chọn nhánh `main` → chọn file trong `final/notebooks/`. Mỗi lần mở lại là bản mới nhất trên GitHub, không cần `git pull`. Muốn lưu chỉnh sửa ngược lại GitHub: `File > Save a copy in GitHub` (Colab tự xử lý qua OAuth, không đụng tới git-trên-Drive nên không gặp lỗi trên).
+
+**Dataset — upload thẳng lên một thư mục Drive thường (không phải git repo), một lần duy nhất:**
 
 ```python
 from google.colab import drive
 drive.mount('/content/drive')
-
-%cd /content/drive/MyDrive
-!git clone https://github.com/HiimDManh/NLP-CS2308.CH203.git
 ```
 
-Lần sau chỉ cần `%cd /content/drive/MyDrive/NLP-CS2308.CH203 && !git pull` để lấy code/notebook mới nhất.
+Trên trình duyệt, vào Google Drive, tạo thư mục `MyDrive/NLP-CS2308.CH203-data/VLQA/`, kéo-thả 5 file json từ máy bạn vào (`legal_corpus.json`, `legal_dataset.json`, `train.json`, `public_test.json`, `private_test.json`). Chỉ cần làm một lần — Drive giữ nguyên giữa các phiên Colab. Đây cũng đúng là lý do dataset bị loại khỏi git (`.gitignore` — 2 file vượt 100MB) nên vốn dĩ không có lựa chọn "kéo theo dataset khi clone code" ngay từ đầu.
 
-Nếu repo là **private**, cần Personal Access Token: `!git clone https://<username>:<token>@github.com/HiimDManh/NLP-CS2308.CH203.git` (không paste token vào cell rồi commit/share notebook — chỉ dùng trong phiên Colab).
-
-**Bước 2 — upload dataset vào đúng vị trí (một lần duy nhất, làm trên trình duyệt, không phải trong Colab):**
-
-Sau khi clone xong, trên Drive sẽ có `MyDrive/NLP-CS2308.CH203/final/dataset/VLQA/` nhưng thư mục này **rỗng phần json** (chỉ có `readme.md` được clone theo git). Vào Google Drive trên trình duyệt, mở đúng thư mục đó, kéo-thả 5 file json từ máy bạn (`legal_corpus.json`, `legal_dataset.json`, `train.json`, `public_test.json`, `private_test.json`) vào. Vì đây là bước thủ công một lần, không cần lặp lại mỗi khi mở Colab — notebook sẽ tự tìm thấy dataset ở đúng path `REPO_DIR/final/dataset/VLQA/` như đã cấu hình (không cần sửa code notebook).
-
-**Cách khác (không dùng git cho code):** upload thẳng cả thư mục `final/` (dataset + notebooks) lên Drive qua giao diện web, rồi mở notebook trực tiếp từ Drive. Đơn giản hơn nhưng phải tự cập nhật thủ công mỗi khi code thay đổi.
-
-### 6.2. Mỗi lần mở một notebook
+### 6.2. Mỗi lần mở notebook
 
 1. `Runtime > Change runtime type > T4 GPU` (cần cho bước embedding ở notebook 01; các notebook sau chủ yếu gọi API nên GPU không bắt buộc, để CPU cũng chạy được).
-2. Chạy cell đầu tiên (`pip install`) rồi cell mount Drive — **sửa biến `REPO_DIR`** trong notebook cho đúng path bạn vừa clone/copy ở bước 6.1 (mặc định notebook giả định `/content/drive/MyDrive/NLP-CS2308.CH203`).
-3. `Runtime > Run all`.
+2. Mở notebook theo cách ở §6.1 (link GitHub trực tiếp, không clone).
+3. Chạy cell `pip install`, rồi cell mount Drive — **kiểm tra biến `DRIVE_DATA_ROOT`** trong notebook khớp đúng thư mục bạn tạo ở §6.1 (mặc định `/content/drive/MyDrive/NLP-CS2308.CH203-data`).
+4. `Runtime > Run all`.
 
 ### 6.3. Thứ tự chạy notebook
 
@@ -140,11 +147,12 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 
 | Sự cố | Cách xử lý |
 |---|---|
+| `fatal: could not open '.../tmp_pack_XXXXXX' for reading` / `invalid index-pack output` khi `git clone`/`git pull` vào Drive | Đừng làm vậy — Google Drive FUSE không tương thích với ghi pack-object của git. Mở notebook trực tiếp từ GitHub (§6.1), không clone vào Drive. Nếu cần git thật (ví dụ để dev code), làm trên máy local hoặc ổ đĩa local `/content/` của Colab (ổ tạm, mất khi hết session), không phải trên `/content/drive/...` |
 | Session bị ngắt giữa chừng lúc encode embedding | Chạy lại notebook 01 — index đã lưu một phần sẽ không tự resume, nhưng vì mất ít hơn ~30-60 phút cho 60k chunk nên chấp nhận chạy lại từ đầu; **không** để mất do quên mount Drive trước khi encode |
 | Hết GPU quota free | Chuyển runtime về CPU — embedding vẫn chạy được, chỉ chậm hơn; các notebook 02-05 không cần GPU |
 | Rate-limit API LLM (Gemini/Groq free tier) | Thêm retry/backoff (đã tính trong thiết kế notebook 02+), giảm batch câu hỏi mỗi lần chạy, hoặc chia dev set thành nhiều lần chạy nhỏ |
-| `REPO_DIR` sai path → `DATA_DIR exists: False` | Kiểm tra lại đường dẫn Drive thực tế bằng `!ls /content/drive/MyDrive` trước khi sửa biến |
-| `DATA_DIR exists: True` nhưng notebook báo thiếu `legal_corpus.json`/`train.json` | Quên bước 2 ở §6.1 (upload dataset thủ công) — `git clone` không kéo các file json vì đã bị `.gitignore`; vào Drive kiểm tra `final/dataset/VLQA/` có đủ 5 file json chưa |
+| `DRIVE_DATA_ROOT` sai path → `DATA_DIR exists: False` | Kiểm tra lại đường dẫn Drive thực tế bằng `!ls /content/drive/MyDrive` trước khi sửa biến |
+| `DATA_DIR exists: True` nhưng notebook báo thiếu `legal_corpus.json`/`train.json` | Quên upload dataset thủ công ở §6.1 — vào Drive kiểm tra `NLP-CS2308.CH203-data/VLQA/` có đủ 5 file json chưa |
 
 ## 7. Kết quả cuối cùng của đồ án sẽ là gì
 
