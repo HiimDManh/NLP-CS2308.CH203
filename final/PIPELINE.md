@@ -88,7 +88,7 @@ Nguyên tắc: **artifacts luôn tái tạo được từ notebook + dataset g�
 
 ## 5. Vì sao không fine-tune (ràng buộc Colab free)
 
-Paper gốc train một critic model + fine-tune generator (7B+) để tự sinh reflection token. Trên Colab free (T4 15GB, session giới hạn giờ, không đảm bảo persistent runtime), việc này không khả thi. Pipeline dùng **Groq API (free tier, không yêu cầu setup billing)** qua package `groq`, model mặc định `llama-3.3-70b-versatile` (đổi được, xem `GENERATOR_MODEL` trong notebook) — cho toàn bộ generate + 4 module judge, để:
+Paper gốc train một critic model + fine-tune generator (7B+) để tự sinh reflection token. Trên Colab free (T4 15GB, session giới hạn giờ, không đảm bảo persistent runtime), việc này không khả thi. Pipeline dùng **Groq API (free tier, không yêu cầu setup billing)** qua package `groq`. `GENERATOR_MODEL` không hardcode — notebook tự dò model chat/instruct thật sự khả dụng trên tài khoản qua `client.models.list()` (tài khoản này không có quyền dùng Llama trên Groq; ưu tiên `qwen/qwen3.6-27b` → `openai/gpt-oss-120b` → `openai/gpt-oss-20b` → `groq/compound-mini` → `groq/compound`, tự động xoay vòng khi một model bị khóa quota dài hạn) — cho toàn bộ generate + 4 module judge, để:
 
 > Ban đầu định dùng Google Gemini, nhưng tài khoản Google của người thực hiện đồ án bị yêu cầu khai báo billing mới cấp API key (chính sách Google có thể đổi theo tài khoản/khu vực) — chuyển sang Groq vì free tier ở đây xác nhận không cần thẻ/billing.
 
@@ -153,7 +153,8 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 | `fatal: could not open '.../tmp_pack_XXXXXX' for reading` / `invalid index-pack output` khi `git clone`/`git pull` vào Drive | Đừng làm vậy — Google Drive FUSE không tương thích với ghi pack-object của git. Mở notebook trực tiếp từ GitHub (§6.1), không clone vào Drive. Nếu cần git thật (ví dụ để dev code), làm trên máy local hoặc ổ đĩa local `/content/` của Colab (ổ tạm, mất khi hết session), không phải trên `/content/drive/...` |
 | Session bị ngắt giữa chừng lúc encode embedding | Chạy lại notebook 01 — index đã lưu một phần sẽ không tự resume, nhưng vì mất ít hơn ~30-60 phút cho 60k chunk nên chấp nhận chạy lại từ đầu; **không** để mất do quên mount Drive trước khi encode |
 | Hết GPU quota free | Chuyển runtime về CPU — embedding vẫn chạy được, chỉ chậm hơn; các notebook 02-05 không cần GPU |
-| Rate-limit API LLM (Groq free tier, 429 liên tục) | Notebook 02 đã đọc header `Retry-After` để chờ chính xác thay vì đoán; nếu vẫn bị chặn, tăng `SLEEP_BETWEEN_CALLS`, giảm `RETRIEVE_K` (ít token/request hơn), hoặc ưu tiên model nhỏ hơn (`llama-3.1-8b-instant`) trong `CANDIDATE_MODELS`. Nếu là chặn theo quota **ngày** (không phải phút), phải hạ `MAX_QUESTIONS` và chạy trải ra nhiều ngày — không có cách chờ trong phiên hiện tại |
+| Rate-limit API LLM (Groq free tier, `Retry-After` vài giây) | Bình thường (per-minute) — notebook 02 đã đọc header `Retry-After` để chờ đúng thời gian, tự qua |
+| Rate-limit API LLM (Groq free tier, `Retry-After` hàng trăm giây, lặp lại ở nhiều câu hỏi liên tiếp) | Đã gặp thật — dấu hiệu quota giờ/ngày của **model đó** đã cạn, không phải per-minute. Notebook 02 tự phát hiện (`LONG_WAIT_THRESHOLD`) và chuyển sang model tiếp theo trong `CANDIDATE_MODELS` thay vì ngồi chờ. Nếu **toàn bộ** model trong danh sách đều bị khóa cùng lúc, không còn cách chờ trong phiên hiện tại — hạ `MAX_QUESTIONS`, chạy tiếp vào phiên/ngày khác |
 | Gemini bắt setup billing mới cấp API key | Đã gặp thật, chuyển hẳn sang Groq (free tier không cần billing) — xem §5 |
 | Groq báo `model_not_found` cho model được liệt kê là "production" trong docs | Đã gặp thật — model khả dụng khác nhau theo tài khoản/thời điểm. Notebook 02 tự gọi `client.models.list()` để dò model thật sự dùng được thay vì hardcode tên, không cần sửa gì thêm |
 | `DRIVE_DATA_ROOT` sai path → `DATA_DIR exists: False` | Kiểm tra lại đường dẫn Drive thực tế bằng `!ls /content/drive/MyDrive` trước khi sửa biến |
@@ -181,7 +182,7 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 
 - [x] Dataset đã verify, hiểu rõ schema (`train.json` có nhãn thật, `public_test`/`private_test` nhãn ẩn).
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
-- [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (`llama-3.3-70b-versatile`; đổi từ Gemini vì Gemini bắt setup billing), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
+- [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `qwen/qwen3.6-27b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [ ] `03_self_rag_pipeline.ipynb` — 4 module reflection.
 - [ ] `04_evaluation_report.ipynb` — chạy 3 hệ, xuất bảng so sánh cuối.
 - [ ] `05_drill_submission.ipynb` — nộp leaderboard (làm sau).
