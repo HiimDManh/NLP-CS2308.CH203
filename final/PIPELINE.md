@@ -71,7 +71,7 @@ final/
 ├── notebooks/             # code — nguồn sự thật của pipeline, chạy trên Colab
 │   ├── 01_retrieval_baseline.ipynb   [ĐÃ CÓ]
 │   ├── 02_generator_baseline.ipynb   [ĐÃ CÓ]
-│   ├── 03_self_rag_pipeline.ipynb    [CHƯA LÀM]
+│   ├── 03_self_rag_pipeline.ipynb    [ĐÃ CÓ]
 │   ├── 04_evaluation_report.ipynb    [CHƯA LÀM]
 │   └── 05_drill_submission.ipynb     [CHƯA LÀM — phương án (b), làm sau cùng]
 └── artifacts/              # SINH RA từ notebook, không commit git (.gitignore)
@@ -142,7 +142,7 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 
 1. `01_retrieval_baseline.ipynb` → sinh `chunks.faiss`, `chunks_meta.json`, `dev_split_qids.json`.
 2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GROQ_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
-3. `03_self_rag_pipeline.ipynb` → dùng lại index + generator prompt từ bước 2, thêm 4 module judge.
+3. `03_self_rag_pipeline.ipynb` → thêm 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE) lên trên cùng hạ tầng retrieve/generate → sinh `self_rag_results.jsonl`. Tốn ~5 lần gọi API/câu hỏi (so với 1 lần ở bước 2), nên thử `MAX_QUESTIONS` nhỏ trước khi chạy full dev set.
 4. `04_evaluation_report.ipynb` → chạy cả 3 hệ trên dev set, xuất `final_comparison_table.csv` + biểu đồ cho báo cáo.
 5. `05_drill_submission.ipynb` → (làm sau cùng, tùy chọn) chạy hệ tốt nhất trên `public_test.json`/`private_test.json`, format đúng chuẩn nộp bài DRiLL.
 
@@ -183,7 +183,7 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 - [x] Dataset đã verify, hiểu rõ schema (`train.json` có nhãn thật, `public_test`/`private_test` nhãn ẩn).
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
 - [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `qwen/qwen3.6-27b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
-- [ ] `03_self_rag_pipeline.ipynb` — 4 module reflection.
+- [x] `03_self_rag_pipeline.ipynb` — 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE), sinh `self_rag_results.jsonl`.
 - [ ] `04_evaluation_report.ipynb` — chạy 3 hệ, xuất bảng so sánh cuối.
 - [ ] `05_drill_submission.ipynb` — nộp leaderboard (làm sau).
 - [ ] Báo cáo + slide (tái sử dụng nội dung từ `seminar/SELF_RAG_SEMINAR_DETAILED_GUIDE.md` cho phần liên quan tới paper gốc).
