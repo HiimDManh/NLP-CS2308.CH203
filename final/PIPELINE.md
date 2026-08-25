@@ -88,7 +88,9 @@ Nguyên tắc: **artifacts luôn tái tạo được từ notebook + dataset g�
 
 ## 5. Vì sao không fine-tune (ràng buộc Colab free)
 
-Paper gốc train một critic model + fine-tune generator (7B+) để tự sinh reflection token. Trên Colab free (T4 15GB, session giới hạn giờ, không đảm bảo persistent runtime), việc này không khả thi. Pipeline dùng **Google Gemini API (free tier)** qua package `google-genai`, model mặc định `gemini-2.5-flash` (đổi được, xem `GENERATOR_MODEL` trong notebook) — cho toàn bộ generate + 4 module judge, để:
+Paper gốc train một critic model + fine-tune generator (7B+) để tự sinh reflection token. Trên Colab free (T4 15GB, session giới hạn giờ, không đảm bảo persistent runtime), việc này không khả thi. Pipeline dùng **Groq API (free tier, không yêu cầu setup billing)** qua package `groq`, model mặc định `llama-3.3-70b-versatile` (đổi được, xem `GENERATOR_MODEL` trong notebook) — cho toàn bộ generate + 4 module judge, để:
+
+> Ban đầu định dùng Google Gemini, nhưng tài khoản Google của người thực hiện đồ án bị yêu cầu khai báo billing mới cấp API key (chính sách Google có thể đổi theo tài khoản/khu vực) — chuyển sang Groq vì free tier ở đây xác nhận không cần thẻ/billing.
 
 - Không tốn GPU quota của Colab cho suy luận (dành GPU cho bước encode embedding một lần).
 - Không phụ thuộc việc giữ session sống lâu để load một model lớn.
@@ -139,7 +141,7 @@ Trên trình duyệt, vào Google Drive, tạo thư mục `MyDrive/NLP-CS2308.CH
 Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact của notebook trước:
 
 1. `01_retrieval_baseline.ipynb` → sinh `chunks.faiss`, `chunks_meta.json`, `dev_split_qids.json`.
-2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GEMINI_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
+2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GROQ_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
 3. `03_self_rag_pipeline.ipynb` → dùng lại index + generator prompt từ bước 2, thêm 4 module judge.
 4. `04_evaluation_report.ipynb` → chạy cả 3 hệ trên dev set, xuất `final_comparison_table.csv` + biểu đồ cho báo cáo.
 5. `05_drill_submission.ipynb` → (làm sau cùng, tùy chọn) chạy hệ tốt nhất trên `public_test.json`/`private_test.json`, format đúng chuẩn nộp bài DRiLL.
@@ -151,7 +153,8 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 | `fatal: could not open '.../tmp_pack_XXXXXX' for reading` / `invalid index-pack output` khi `git clone`/`git pull` vào Drive | Đừng làm vậy — Google Drive FUSE không tương thích với ghi pack-object của git. Mở notebook trực tiếp từ GitHub (§6.1), không clone vào Drive. Nếu cần git thật (ví dụ để dev code), làm trên máy local hoặc ổ đĩa local `/content/` của Colab (ổ tạm, mất khi hết session), không phải trên `/content/drive/...` |
 | Session bị ngắt giữa chừng lúc encode embedding | Chạy lại notebook 01 — index đã lưu một phần sẽ không tự resume, nhưng vì mất ít hơn ~30-60 phút cho 60k chunk nên chấp nhận chạy lại từ đầu; **không** để mất do quên mount Drive trước khi encode |
 | Hết GPU quota free | Chuyển runtime về CPU — embedding vẫn chạy được, chỉ chậm hơn; các notebook 02-05 không cần GPU |
-| Rate-limit API LLM (Gemini/Groq free tier) | Thêm retry/backoff (đã tính trong thiết kế notebook 02+), giảm batch câu hỏi mỗi lần chạy, hoặc chia dev set thành nhiều lần chạy nhỏ |
+| Rate-limit API LLM (Groq free tier) | Thêm retry/backoff (đã tính trong thiết kế notebook 02+), giảm batch câu hỏi mỗi lần chạy, hoặc chia dev set thành nhiều lần chạy nhỏ |
+| Gemini bắt setup billing mới cấp API key | Đã gặp thật, chuyển hẳn sang Groq (free tier không cần billing) — xem §5 |
 | `DRIVE_DATA_ROOT` sai path → `DATA_DIR exists: False` | Kiểm tra lại đường dẫn Drive thực tế bằng `!ls /content/drive/MyDrive` trước khi sửa biến |
 | `DATA_DIR exists: True` nhưng notebook báo thiếu `legal_corpus.json`/`train.json` | Quên upload dataset thủ công ở §6.1 — vào Drive kiểm tra `NLP-CS2308.CH203-data/VLQA/` có đủ 5 file json chưa |
 
@@ -177,7 +180,7 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 
 - [x] Dataset đã verify, hiểu rõ schema (`train.json` có nhãn thật, `public_test`/`private_test` nhãn ẩn).
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
-- [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Gemini API (`gemini-2.5-flash`), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
+- [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (`llama-3.3-70b-versatile`; đổi từ Gemini vì Gemini bắt setup billing), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [ ] `03_self_rag_pipeline.ipynb` — 4 module reflection.
 - [ ] `04_evaluation_report.ipynb` — chạy 3 hệ, xuất bảng so sánh cuối.
 - [ ] `05_drill_submission.ipynb` — nộp leaderboard (làm sau).
