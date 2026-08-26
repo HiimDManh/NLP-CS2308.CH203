@@ -72,7 +72,7 @@ final/
 │   ├── 01_retrieval_baseline.ipynb   [ĐÃ CÓ]
 │   ├── 02_generator_baseline.ipynb   [ĐÃ CÓ]
 │   ├── 03_self_rag_pipeline.ipynb    [ĐÃ CÓ]
-│   ├── 04_evaluation_report.ipynb    [CHƯA LÀM]
+│   ├── 04_evaluation_report.ipynb    [ĐÃ CÓ]
 │   └── 05_drill_submission.ipynb     [CHƯA LÀM — phương án (b), làm sau cùng]
 └── artifacts/              # SINH RA từ notebook, không commit git (.gitignore)
     ├── chunks.faiss                  # FAISS index của ~60k chunk điều luật
@@ -81,6 +81,8 @@ final/
     ├── retrieval_baseline_metrics.csv
     ├── standard_rag_results.jsonl    # (Notebook 02) câu trả lời Hệ 2 — checkpoint theo từng qid, resume-safe
     ├── self_rag_results.jsonl        # (Notebook 03) câu trả lời Hệ 3 + reflection report từng qid
+    ├── no_rag_results.jsonl          # (Notebook 04) câu trả lời Hệ 1 (No-RAG), sinh trong chính notebook 04
+    ├── evaluation_details.jsonl      # (Notebook 04) Correctness/Support/Usefulness hậu kiểm từng câu, cả 3 hệ
     └── final_comparison_table.csv    # (Notebook 04) bảng so sánh 3 hệ, dùng thẳng cho báo cáo
 ```
 
@@ -143,7 +145,7 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 1. `01_retrieval_baseline.ipynb` → sinh `chunks.faiss`, `chunks_meta.json`, `dev_split_qids.json`.
 2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GROQ_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
 3. `03_self_rag_pipeline.ipynb` → thêm 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE) lên trên cùng hạ tầng retrieve/generate → sinh `self_rag_results.jsonl`. Tốn ~5 lần gọi API/câu hỏi (so với 1 lần ở bước 2), nên thử `MAX_QUESTIONS` nhỏ trước khi chạy full dev set.
-4. `04_evaluation_report.ipynb` → chạy cả 3 hệ trên dev set, xuất `final_comparison_table.csv` + biểu đồ cho báo cáo.
+4. `04_evaluation_report.ipynb` → không phụ thuộc GPU/embedding; sinh thêm Hệ 1 (No-RAG), rồi chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau các câu đã xong (không giả định đủ 250 câu) → xuất `final_comparison_table.csv`.
 5. `05_drill_submission.ipynb` → (làm sau cùng, tùy chọn) chạy hệ tốt nhất trên `public_test.json`/`private_test.json`, format đúng chuẩn nộp bài DRiLL.
 
 ### 6.4. Xử lý sự cố Colab thường gặp
@@ -167,13 +169,15 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung báo cáo guideline §28):
 
 1. **Hệ thống chạy được** (notebook 01-04, tái chạy được từ đầu trên Colab free): nhập một câu hỏi pháp luật tiếng Việt, hệ Self-RAG-inspired trả về câu trả lời + danh sách điều luật trích dẫn (`law_id`, số điều) + reflection report (Retrieve/ISREL/ISSUP/ISUSE).
-2. **Bảng so sánh định lượng 3 hệ thống** trên cùng 250 câu dev set cố định — ví dụ khung bảng (số liệu thật sẽ điền sau khi chạy notebook 04):
+2. **Bảng so sánh định lượng 3 hệ thống** (`final_comparison_table.csv`, notebook 04) — trên phần giao nhau các câu đã chạy xong cả 3 hệ (không nhất thiết đủ 250 câu, tùy quota Groq free tier còn lại khi chạy):
 
-   | Hệ thống | Recall@5 (retrieval) | MRR | Answer quality (LLM-judge) | Support rate (ISSUP) | Usefulness rate (ISUSE) |
-   |---|---|---|---|---|---|
-   | No-RAG | — | — | ? | ? | ? |
-   | Standard RAG | ? | ? | ? | ? | ? |
-   | Self-RAG-inspired | ? | ? | ? | ? | ? |
+   | Hệ thống | Recall | Precision | MRR | Correctness_rate/score | Support_rate | Usefulness_rate/score |
+   |---|---|---|---|---|---|---|
+   | No-RAG | — | — | — | ? | — (N/A, không có evidence) | ? |
+   | Standard RAG | ? | ? | ? | ? | ? | ? |
+   | Self-RAG-inspired | ? (sau ISREL) | ? (sau ISREL) | ? | ? | ? | ? |
+
+   Notebook 04 cũng in ra so sánh Recall **trước/sau** `[ISREL]` của Self-RAG — bằng chứng định lượng cho việc lọc nhiễu có giữ được evidence đúng hay không.
 
 3. **Phân tích case cụ thể**: ví dụ câu hỏi mà Self-RAG-inspired lọc được điều luật nhiễu (RAG chuẩn không lọc), và ví dụ câu hỏi mà self-critique phát hiện answer không được hỗ trợ (hallucination) — dùng cho phần Discussion của báo cáo.
 4. **Báo cáo cuối kỳ** theo khung §28 của guideline (Introduction → Related Work → Methodology → Implementation → Experiments → Results → Discussion → Conclusion), dùng trực tiếp bảng/case ở trên.
@@ -186,6 +190,6 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
 - [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `qwen/qwen3.6-27b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [x] `03_self_rag_pipeline.ipynb` — 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE), sinh `self_rag_results.jsonl`.
-- [ ] `04_evaluation_report.ipynb` — chạy 3 hệ, xuất bảng so sánh cuối.
+- [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`.
 - [ ] `05_drill_submission.ipynb` — nộp leaderboard (làm sau).
 - [ ] Báo cáo + slide (tái sử dụng nội dung từ `seminar/SELF_RAG_SEMINAR_DETAILED_GUIDE.md` cho phần liên quan tới paper gốc).
