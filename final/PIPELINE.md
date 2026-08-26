@@ -18,7 +18,7 @@ Shared task **VLSP2025 DRiLL** (https://vlsp.org.vn/vlsp2025/eval/drill), nằm 
 |---|---|---|
 | `legal_corpus.json` / `legal_dataset.json` | Corpus tri thức (2 dạng biểu diễn của cùng 2157 văn bản luật) | 59 636 điều luật (`aid` duy nhất toàn cục) |
 | `train.json` | Câu hỏi có nhãn thật: `question` + `relevant_laws` (gold `aid`) + `answer` (câu trả lời người viết) | 2190 câu |
-| `public_test.json` / `private_test.json` | Cùng schema nhưng nhãn bị ẩn — chỉ dùng khi nộp leaderboard chính thức | 312 / 627 câu |
+| `public_test.json` / `private_test.json` | Cùng schema nhưng nhãn bị ẩn. Vốn chỉ dùng khi nộp leaderboard chính thức, nhưng **hạn nộp VLSP2025 DRiLL (12/08/2025) đã qua** — không còn cách nào chấm 2 file này, kể cả cục bộ lẫn qua leaderboard. Coi như không dùng được, chỉ giữ lại cho đủ bộ dữ liệu | 312 / 627 câu |
 
 Vì `public_test`/`private_test` không dùng để tự đánh giá được, pipeline dùng một **dev set cố định 250 câu** tách từ `train.json` (seed 42) cho mọi so sánh nội bộ — xem §4.
 
@@ -73,7 +73,7 @@ final/
 │   ├── 02_generator_baseline.ipynb   [ĐÃ CÓ]
 │   ├── 03_self_rag_pipeline.ipynb    [ĐÃ CÓ]
 │   ├── 04_evaluation_report.ipynb    [ĐÃ CÓ]
-│   └── 05_drill_submission.ipynb     [CHƯA LÀM — phương án (b), làm sau cùng]
+│   (05_drill_submission.ipynb — ĐÃ HỦY, xem §8: hạn nộp VLSP2025 DRiLL 12/08/2025 đã qua)
 └── artifacts/              # SINH RA từ notebook, không commit git (.gitignore)
     ├── chunks.faiss                  # FAISS index của ~60k chunk điều luật
     ├── chunks_meta.json              # metadata chunk (aid, law_id, text)
@@ -146,7 +146,7 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GROQ_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
 3. `03_self_rag_pipeline.ipynb` → thêm 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE) lên trên cùng hạ tầng retrieve/generate → sinh `self_rag_results.jsonl`. Tốn ~5 lần gọi API/câu hỏi (so với 1 lần ở bước 2), nên thử `MAX_QUESTIONS` nhỏ trước khi chạy full dev set.
 4. `04_evaluation_report.ipynb` → không phụ thuộc GPU/embedding; sinh thêm Hệ 1 (No-RAG), rồi chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau các câu đã xong (không giả định đủ 250 câu) → xuất `final_comparison_table.csv`.
-5. `05_drill_submission.ipynb` → (làm sau cùng, tùy chọn) chạy hệ tốt nhất trên `public_test.json`/`private_test.json`, format đúng chuẩn nộp bài DRiLL.
+~~5. `05_drill_submission.ipynb`~~ — đã hủy, xem §8.
 
 ### 6.4. Xử lý sự cố Colab thường gặp
 
@@ -182,7 +182,7 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 3. **Phân tích case cụ thể**: ví dụ câu hỏi mà Self-RAG-inspired lọc được điều luật nhiễu (RAG chuẩn không lọc), và ví dụ câu hỏi mà self-critique phát hiện answer không được hỗ trợ (hallucination) — dùng cho phần Discussion của báo cáo.
 4. **Báo cáo cuối kỳ** theo khung §28 của guideline (Introduction → Related Work → Methodology → Implementation → Experiments → Results → Discussion → Conclusion), dùng trực tiếp bảng/case ở trên.
 5. **Demo** chạy trực tiếp trong Colab (nhập câu hỏi trong 1 cell, hoặc UI Gradio đơn giản nếu có thời gian).
-6. **(Tùy chọn, phương án (b))** một bản nộp lên leaderboard VLSP2025 DRiLL bằng hệ tốt nhất — cho điểm cộng "được đánh giá độc lập" ngoài phạm vi môn học.
+6. ~~Nộp lên leaderboard VLSP2025 DRiLL~~ — đã hủy: hạn nộp hệ thống là 12/08/2025, đã qua từ lâu tính đến thời điểm làm đồ án (xem §8).
 
 ## 8. Trạng thái hiện tại
 
@@ -191,5 +191,6 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 - [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `qwen/qwen3.6-27b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [x] `03_self_rag_pipeline.ipynb` — 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE), sinh `self_rag_results.jsonl`.
 - [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`.
-- [ ] `05_drill_submission.ipynb` — nộp leaderboard (làm sau).
+- [x] Demo — thêm mục "Demo" vào cuối `03_self_rag_pipeline.ipynb` (chạy `run_self_rag()` trực tiếp trong 1 cell với câu hỏi tùy chỉnh, in answer + nguồn trích dẫn + reflection report).
+- [x] ~~`05_drill_submission.ipynb`~~ — **đã hủy**. Fetch trang chính thức https://vlsp.org.vn/vlsp2025/eval/drill xác nhận hạn nộp hệ thống là **12/08/2025 23:59 UTC** (nộp qua Codabench, chấm bằng Recall/Precision/Macro-F2) — đã qua hơn 1 năm tính đến thời điểm làm đồ án này, không còn đường nộp thật. Quyết định (do người dùng chọn): dừng hẳn, không build notebook dự đoán trên `public_test.json`/`private_test.json` nữa, tập trung thời gian còn lại cho báo cáo/slide.
 - [ ] Báo cáo + slide (tái sử dụng nội dung từ `seminar/SELF_RAG_SEMINAR_DETAILED_GUIDE.md` cho phần liên quan tới paper gốc).
