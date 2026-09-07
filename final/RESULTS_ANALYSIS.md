@@ -1,184 +1,160 @@
 # Phân tích kết quả & Kế hoạch viết báo cáo
 
-Tài liệu này tổng hợp toàn bộ số liệu thực tế từ `final/artifacts/` (pull về ngày 26/08/2026), phân tách rõ **số liệu dùng được** và **số liệu lỗi cần chạy lại**, kèm ablation analysis và case study cụ thể để đưa thẳng vào báo cáo cuối kỳ. Tham chiếu khung báo cáo: `SELF_RAG_SEMINAR_PROJECT_GUIDELINE.md` §28.
+Tài liệu này tổng hợp số liệu thực tế từ `final/artifacts/` (pull mới nhất ngày 07/09/2026, sau khi quay lại dùng Groq), phân tách rõ **số liệu dùng được** và **số liệu lỗi cần chạy lại**, kèm ablation analysis và case study cụ thể để đưa thẳng vào báo cáo cuối kỳ. Tham chiếu khung báo cáo: `SELF_RAG_SEMINAR_PROJECT_GUIDELINE.md` §28.
 
 ## 0. Tóm tắt nhanh (đọc trước)
 
-- **Phát hiện 1 lỗi nghiêm trọng đã sửa**: cột `Correctness` (cả 3 hệ) và `Standard RAG Support/Usefulness`, `No-RAG Usefulness` trong `final_comparison_table.csv` hiện tại **không dùng được** — 100% là giá trị mặc định do lỗi parse, không phải đánh giá thật. Nguyên nhân + cách sửa ở §2.
-- **Số liệu dùng được ngay**: toàn bộ chỉ số retrieval (Recall/Precision/MRR, có/không có `[ISREL]`), phân bố `[Retrieve]`/`[ISSUP]`/`[ISUSE]` thật của Self-RAG (tính từ Notebook 3, không bị lỗi), và một phát hiện ablation khá mạnh: **khi `[ISREL]` thực sự lọc bớt passage, tỷ lệ FULLY_SUPPORTED tăng từ 15% lên 83%** (§4).
-- **Việc cần làm trước khi chốt số cho báo cáo**: xoá `evaluation_details.jsonl` + `final_comparison_table.csv`, chạy lại §7-§10 của `04_evaluation_report.ipynb` (đã vá lỗi) — không cần chạy lại Notebook 2/3. Chi tiết ở §6.
+- **Lỗi `<think>` (đã ghi nhận từ lần trước) nay gần như hết**: sau khi hạ ưu tiên `qwen/qwen3.6-27b` xuống cuối `CANDIDATE_MODELS`, tỷ lệ nhiễm `<think>` giảm còn 0/250 (Standard RAG), 0/202 (No-RAG), 7/202 = 3.5% (Self-RAG) — không còn là vấn đề đáng kể.
+- **Phát hiện 1 lỗi MỚI, nghiêm trọng hơn, chưa có trong lần phân tích trước**: `Correctness` của **cả 3 hệ**, và `Support`/`Usefulness` mới tính riêng cho No-RAG/Standard RAG trong `final_comparison_table.csv` hiện tại **không dùng được** — chỉ 2/202 câu là chấm thật, 200/202 câu (99%) rơi vào giá trị mặc định do hết quota Groq giữa chừng. Chi tiết + đã vá code ở §2.
+- **Số liệu dùng được ngay** (không bị ảnh hưởng bởi lỗi trên): toàn bộ chỉ số retrieval (Recall/Precision/MRR, có/không có `[ISREL]`), phân bố `[Retrieve]`/`[ISSUP]`/`[ISUSE]` thật của Self-RAG (từ Notebook 3, ghi thẳng vào `self_rag_results.jsonl`, không đi qua đoạn code bị lỗi của Notebook 4), và ablation `[ISREL]` → `[ISSUP]` vẫn cho thấy hiệu ứng rất mạnh (§4).
+- **Việc cần làm trước khi chốt số cho báo cáo**: xoá `evaluation_details.jsonl` + `final_comparison_table.csv`, chạy lại `04_evaluation_report.ipynb` (đã vá: tự dừng sớm khi hết quota + tự cảnh báo nếu có câu bị mặc định) **vào lúc quota Groq còn nhiều, tách riêng khỏi lần chạy Notebook 2/3** — chi tiết ở §6.
 
-## 1. Cỡ mẫu thực tế
+## 1. Cỡ mẫu thực tế (lần pull 07/09/2026)
 
 | Hệ thống | Số câu hoàn thành | Ghi chú |
 |---|---:|---|
 | Dev set cố định (Notebook 1) | 250 | Toàn bộ Recall@k/Precision@k/MRR ở Notebook 1 tính trên 250 câu này |
 | Standard RAG (Notebook 2) | 250 / 250 (100%) | Hoàn thành đủ |
-| Self-RAG-inspired (Notebook 3) | 213 / 250 (85.2%) | 37 câu chưa chạy (rate-limit) |
-| No-RAG (sinh trong Notebook 4) | 213 / 213 | Chỉ sinh trên phần giao Standard ∩ Self-RAG |
-| **Tập dùng để so sánh 3 hệ** | **213** | Giao của cả 3 hệ |
+| Self-RAG-inspired (Notebook 3) | 202 / 250 (80.8%) | 48 câu chưa chạy (rate-limit/quota) |
+| No-RAG (sinh trong Notebook 4) | 202 / 202 | Chỉ sinh trên phần giao Standard ∩ Self-RAG |
+| **Tập dùng để so sánh 3 hệ** | **202** | Giao của cả 3 hệ |
 
-213/250 (85%) là cỡ mẫu khá tốt, không phải vấn đề — không cần cố chạy nốt 37 câu còn lại trừ khi muốn có con số tròn 250.
+202/250 (81%) vẫn là cỡ mẫu chấp nhận được cho một free-tier project — không bắt buộc phải chạy nốt 48 câu còn lại trừ khi muốn con số tròn hơn.
 
-Đối chiếu để kiểm tra tính đại diện của subset 213 so với full 250 (Notebook 1):
-
-| | Recall@5 | Precision@5 | MRR |
-|---|---:|---:|---:|
-| Full dev set (250 câu, Notebook 1) | 0.498 | 0.122 | 0.420 |
-| Subset 213 câu (Notebook 4, retriever giống hệt) | 0.505 | 0.126 | 0.417 |
-
-Hai bộ số gần như trùng khớp → **subset 213 câu đại diện tốt cho toàn bộ dev set**, không có thiên lệch đáng kể do 37 câu bị thiếu là ngẫu nhiên (do rate-limit, không liên quan nội dung câu hỏi).
-
-## 2. Lỗi đã phát hiện và sửa: model "thinking" (`qwen/qwen3.6-27b`) làm hỏng judge
+## 2. Lỗi MỚI phát hiện: quota Groq cạn giữa chừng làm hỏng Correctness (cả 3 hệ) + Support/Usefulness (No-RAG/Standard RAG)
 
 ### Hiện tượng phát hiện được
 
-Trong `final_comparison_table.csv` hiện tại:
+`final_comparison_table.csv` (trước khi vá):
 
-| Hệ thống | Correctness_rate | Support_rate | Usefulness_rate |
-|---|---:|---:|---:|
-| No-RAG | 0.0 | N/A | 0.0 |
-| Standard RAG | 0.0 | 0.0 | 0.0 |
-| Self-RAG-inspired | 0.0 | 0.704 | 0.563 |
+| Hệ thống | Correctness_rate | Correctness_score | Support_rate | Usefulness_rate |
+|---|---:|---:|---:|---:|
+| No-RAG | 0.005 | 0.502 | — | 0.010 |
+| Standard RAG | 0.0 | 0.498 | 0.005 | 0.0 |
+| Self-RAG-inspired | 0.0 | 0.498 | 0.634 | 0.619 |
 
-`Correctness_rate = 0.0` cho **cả 3 hệ** vì **100% trong 213 câu đều nhận đúng một nhãn `PARTIALLY_CORRECT`** — không có một ngoại lệ nào. Tương tự, `standard_support` 100% `PARTIALLY_SUPPORTED`, `standard_usefulness` và `norag_usefulness` 100% `PARTIALLY_USEFUL`. Đây chính xác là giá trị **mặc định (fallback)** được code trả về khi không parse được JSON từ model — xác suất một judge thật cho ra đúng 1 nhãn suốt 213 câu hỏi đa dạng là gần như bằng 0, nên đây là **bằng chứng thống kê rõ ràng của lỗi hệ thống**, không phải trùng hợp.
+`Correctness_score ≈ 0.5` cho **cả 3 hệ** — dấu hiệu y hệt lần trước (giá trị mặc định của `judge_correctness` khi parse JSON thất bại là `PARTIALLY_CORRECT` = 0.5 điểm). Khác lần trước ở chỗ: `Support_rate`/`Usefulness_rate` của **Self-RAG vẫn cho số hợp lý** (0.634/0.619) trong khi No-RAG/Standard RAG gần như bằng 0 — gợi ý lỗi không nằm ở `<think>` (đã sửa) mà ở một nguyên nhân khác, chỉ ảnh hưởng tới các giá trị **tính mới trong Notebook 4**.
 
-### Nguyên nhân gốc (đã xác minh trực tiếp trong dữ liệu)
+### Nguyên nhân gốc (xác minh trực tiếp: soi thứ tự các dòng trong `evaluation_details.jsonl`)
 
-Kiểm tra `no_rag_answer`/`standard_answer` thô trong `evaluation_details.jsonl`, phát hiện chúng chứa nguyên khối:
+Kiểm tra theo đúng thứ tự ghi (append-only), chỉ **2 dòng đầu tiên** (qid 15, qid 32) có nhãn judge đa dạng thật (`CORRECT`, `INCORRECT`, `USEFUL`, `FULLY_SUPPORTED`...) — **toàn bộ 200 dòng còn lại** (qid thứ 3 trở đi) có **100% cả 6 giá trị judge tính mới** (`norag_correctness`, `norag_usefulness`, `standard_correctness`, `standard_support`, `standard_usefulness`, `self_correctness`) đều là giá trị mặc định.
 
-```text
-<think>
-The user asks: "..."
-... (hàng nghìn ký tự suy luận) ...
-</think>
+Giải thích: Notebook 4 tốn **6 lệnh gọi LLM/câu** — nhiều hơn hẳn Notebook 2 (1 lệnh/câu) và Notebook 3 (~5 lệnh/câu). Khi chạy Notebook 4 **sau khi** Notebook 2 (250 câu) và Notebook 3 (202 câu × ~5 lệnh) đã tiêu tốn phần lớn quota Groq free-tier trong cùng phiên/ngày, quota cạn hẳn chỉ sau 1-2 câu đầu của Notebook 4. Từ đó, `chat()` trả về `""` (tất cả model trong `CANDIDATE_MODELS` đều nằm trong `exhausted_models`) cho **mọi** lệnh gọi tiếp theo, khiến mọi `judge_*()` lặng lẽ rơi vào nhánh mặc định — không có lỗi/exception nào để phát hiện, notebook vẫn chạy xong "bình thường" và xuất ra một bảng CSV **trông có vẻ hợp lệ**.
 
-<câu trả lời thật>
-```
+**Vì sao `self_support`/`self_usefulness` (Self-RAG) không bị ảnh hưởng?** Vì 2 cột này **không tính lại trong Notebook 4** — chúng được copy nguyên văn từ `issup_label`/`isuse_label` đã lưu sẵn trong `self_rag_results.jsonl`, vốn được tính từ một phiên chạy Notebook 3 **riêng biệt, trước đó, với quota còn đủ**. Tương tự, toàn bộ số liệu retrieval (Recall/Precision/MRR) không đi qua LLM-judge nào cả (tính thuần Python trên `retrieved_aids`/`relevant_aids`) nên cũng không bị ảnh hưởng.
 
-`qwen/qwen3.6-27b` — model đứng đầu `CANDIDATE_MODELS` lúc đó — là model kiểu **"thinking"**: luôn sinh khối suy luận `<think>...</think>` trước nội dung thật, **kể cả khi prompt yêu cầu "chỉ trả về JSON, không giải thích gì thêm"**. Hệ quả:
+**Bằng chứng cụ thể (soi tay 2 câu, vì bản ghi cũ không lưu `reason` nên phải đọc trực tiếp câu trả lời)**:
+- **qid 11575** ("Địa điểm kinh doanh của hộ kinh doanh được quy định ra sao?"): câu trả lời Standard RAG gần như **trùng khớp hoàn toàn** với gold answer (cùng trích đúng Điều 86 Nghị định 01/2021/NĐ-CP, cùng nội dung) — nhưng bị chấm `PARTIALLY_CORRECT` thay vì `CORRECT`.
+- **qid 1179** ("Cơ quan nào có thẩm quyền cho thuê đất để xây dựng trụ sở đại sứ quán nước ngoài?"): câu trả lời Self-RAG nói **"Bộ Xây dựng"** có thẩm quyền, trong khi gold answer nói rõ là **"Ủy ban nhân dân cấp tỉnh"** (căn cứ Điều 59 Luật Đất đai 2013) — hai câu trả lời **mâu thuẫn trực tiếp**, nhưng vẫn bị chấm `PARTIALLY_CORRECT` thay vì `INCORRECT`.
 
-1. Câu trả lời final (No-RAG/Standard RAG) bị lẫn cả đoạn suy luận dài vào `generated_answer`.
-2. `extract_json()` (dùng cho `judge_correctness`/`judge_support`/`judge_usefulness`) không tách được JSON thật ra khỏi khối `<think>` một cách đáng tin cậy — đặc biệt khi model "nhắc lại" ví dụ định dạng JSON của prompt ngay trong lúc suy luận, khiến regex tham lam `\{.*\}` khớp nhầm. Kết quả: hầu hết lệnh gọi rơi vào nhánh mặc định.
-3. Trường hợp xấu nhất (gặp thật ở qid 85): chuỗi suy luận quá dài, bị cắt cụt do giới hạn token đầu ra **trước khi** model kịp đóng `</think>` — toàn bộ câu trả lời chỉ còn là suy luận dở dang, không cứu được.
+Cả 2 ví dụ đều không thể giải thích bằng "judge chấm đúng nhưng khắt khe" — chúng là bằng chứng trực tiếp cho việc judge **không thực sự chạy**, chỉ trả về giá trị mặc định.
 
-Đo được tỷ lệ nhiễm thực tế trên dữ liệu đã pull:
+### Đã sửa gì (trong `04_evaluation_report.ipynb`, mục §8, 07/09/2026)
 
-| File | Tổng | Có `<think>` |
-|---|---:|---:|
-| `standard_rag_results.jsonl` | 250 | 82 (32.8%) |
-| `self_rag_results.jsonl` | 213 | 29 (13.6%) |
-| `no_rag_results.jsonl` | 213 | 158 (74.2%) |
+1. **Dừng sớm khi hết quota**: vòng lặp đánh giá giờ kiểm tra `model_queue()` trước mỗi câu — nếu rỗng (mọi model đều bị khóa), dừng ngay và in rõ số câu đã chấm thật trong lần chạy đó, thay vì tiếp tục ghi hàng trăm dòng mặc định vô nghĩa. Resume-safe như cũ — chạy lại sau khi quota reset sẽ tiếp tục đúng chỗ dừng.
+2. **Lưu lại `_reason` của từng judge** (`norag_correctness_reason`, `standard_support_reason`, ...) vào `evaluation_details.jsonl` — trước đây không lưu, nên lần này phải soi tay câu trả lời mới phát hiện ra vấn đề.
+3. **Tự đếm và cảnh báo**: sau mỗi lần chạy, in dòng `CANH BAO: X/Y cau bi mac dinh toan bo...` nếu phát hiện câu nào có toàn bộ 6 judge đều trả về đúng reason mặc định — giúp phát hiện sự cố này ngay lập tức ở lần chạy tiếp theo, không cần phân tích thủ công như lần này.
 
-Tỷ lệ khác nhau giữa các file vì cơ chế xoay vòng model (`exhausted_models`) khiến các lần chạy khác nhau rơi trúng `qwen` với tần suất khác nhau tuỳ quota còn lại tại thời điểm chạy.
+### Bài học rút ra cho việc chạy lại (đưa thẳng vào §6)
 
-**Vì sao `self_support`/`self_usefulness` (Self-RAG) vẫn đúng?** Vì 2 cột này được Notebook 4 **tái dùng nguyên** giá trị đã tính từ Notebook 3 (`issup_label`/`isuse_label`), không tính lại — và lần chạy Notebook 3 đó tỷ lệ nhiễm `<think>` thấp hơn (13.6%) nên phần lớn vẫn parse đúng. Đây là may mắn ngẫu nhiên, không phải do thiết kế miễn nhiễm.
+Nguyên nhân sâu xa không phải lỗi code (đã đúng từ trước) mà là **thứ tự/thời điểm chạy**: dồn cả Notebook 2 + 3 + 4 trong cùng một phiên/ngày trên cùng một tài khoản Groq free-tier khiến notebook tốn quota nhiều nhất (Notebook 4, 6 lệnh/câu) luôn là nạn nhân cuối cùng hết quota. Nên **chạy Notebook 4 riêng, vào lúc quota còn nguyên** (ví dụ đầu ngày mới, chưa chạy gì khác).
 
-### Đã sửa những gì (trong `02_generator_baseline.ipynb`, `03_self_rag_pipeline.ipynb`, `04_evaluation_report.ipynb`)
-
-1. Thêm hàm `strip_think()` — cắt bỏ `<think>...</think>` bằng regex trước khi:
-   - Parse JSON trong `extract_json()`.
-   - Lưu/dùng làm `generated_answer` (áp dụng ngay tại điểm dùng trong Notebook 4, nên **không cần chạy lại Notebook 2/3** dù dữ liệu nguồn của chúng vẫn còn nhiễm — Notebook 4 tự làm sạch khi đọc).
-2. Đổi thứ tự `CANDIDATE_MODELS`: đưa `qwen/qwen3.6-27b` xuống **cuối cùng** (trước đó đứng đầu), ưu tiên `openai/gpt-oss-120b` → `openai/gpt-oss-20b` — hai model này không gặp vấn đề "thinking" nên giảm hẳn tần suất gặp lại lỗi lớp này, kể cả với các câu chưa parse lỗi hoàn toàn (JSON kẹp trong `<think>` không đóng vẫn là rủi ro tiềm ẩn không thể cứu 100% bằng `strip_think`).
-
-### Giới hạn còn lại (thành thật, để ghi vào phần Limitations của báo cáo)
-
-`strip_think()` chỉ cứu được khi model **đóng** `</think>` trước khi hết token — nếu bị cắt cụt giữa chừng (trường hợp qid 85), không có cách khôi phục câu trả lời. Hạ ưu tiên `qwen` xuống cuối giảm tần suất chứ không loại bỏ hoàn toàn rủi ro này (vẫn có thể bị chọn khi 2 model kia cạn quota).
-
-## 3. Số liệu retrieval — DÙNG ĐƯỢC (tính thuần Python, không qua LLM-judge)
+## 3. Số liệu retrieval — DÙNG ĐƯỢC (tính thuần Python, không qua LLM-judge, n=202)
 
 | | Recall | Precision | MRR |
 |---|---:|---:|---:|
-| Standard RAG (top-5 cố định) | 0.505 | 0.126 | 0.417 |
-| Self-RAG **trước** `[ISREL]` (top-5 thô) | 0.502 | 0.126 | — |
-| Self-RAG **sau** `[ISREL]` (đã lọc) | 0.417 | 0.285 | 0.410 |
+| Standard RAG (top-5 cố định) | 0.490 | 0.124 | 0.411 |
+| Self-RAG **trước** `[ISREL]` (top-5 thô, n=193 câu có RETRIEVE) | 0.495 | 0.125 | — |
+| Self-RAG **sau** `[ISREL]` (đã lọc) | 0.423 | 0.278 | 0.413 |
 
-**Diễn giải cho báo cáo**: `[ISREL]` giúp **Precision tăng +126% tương đối** (0.126 → 0.285) nhưng **Recall giảm 17% tương đối** (0.502 → 0.417). Đây **không phải** kết quả lý tưởng kiểu "giữ nguyên recall, chỉ tăng precision" như kỳ vọng ban đầu trong `PIPELINE.md` — mà là một **đánh đổi thật**: mô hình lọc khá mạnh tay, có xu hướng loại bỏ luôn một số passage đúng cùng với passage nhiễu. Đây là điểm phân tích trung thực và có giá trị cho phần Discussion (đúng tinh thần guideline: "nếu Self-RAG-inspired không luôn tốt hơn baseline, vẫn có thể phân tích lý do — đó là một phần tốt của báo cáo khoa học").
+**Diễn giải cho báo cáo**: cùng một hình dạng kết quả như lần trước — `[ISREL]` giúp **Precision tăng ~2.2 lần** (0.125 → 0.278) nhưng **Recall giảm ~15% tương đối** (0.495 → 0.423). Đây là một **đánh đổi thật**, không phải "lọc nhiễu miễn phí" — mô hình filter khá mạnh tay, loại bỏ luôn một phần passage đúng cùng với passage nhiễu. Nhất quán với lần phân tích trước (0.502→0.417 recall, 0.126→0.285 precision) — củng cố đây là hành vi hệ thống, không phải nhiễu ngẫu nhiên của một lần chạy.
 
 Thống kê mức độ lọc:
-- Trung bình mỗi câu: **4.88 passage được retrieve → còn 2.29 passage sau lọc** (lọc bỏ ~53%).
-- Trong số 208 câu có `[Retrieve]=RETRIEVE`, `[ISREL]` lọc bớt ít nhất 1 passage ở **173 câu (83.2%)** — module này hoạt động tích cực, không phải no-op.
+- Trung bình mỗi câu (khi có RETRIEVE): **5.00 passage được retrieve → còn 2.39 passage sau lọc** (lọc bỏ ~52%).
+- Trong số 193 câu có `[Retrieve]=RETRIEVE`, `[ISREL]` lọc bớt ít nhất 1 passage ở **152 câu (78.8%)**.
 
-## 4. Phân bố phản tư (reflection) thật của Self-RAG — DÙNG ĐƯỢC (n=213, từ Notebook 3)
+## 4. Phân bố phản tư (reflection) thật của Self-RAG — DÙNG ĐƯỢC (n=202, từ Notebook 3, không qua đoạn code lỗi của Notebook 4)
 
 **`[Retrieve]`**:
 
 | Quyết định | Số câu | Tỷ lệ |
 |---|---:|---:|
-| RETRIEVE | 208 | 97.7% |
-| NO_RETRIEVE | 5 | 2.3% |
+| RETRIEVE | 193 | 95.5% |
+| NO_RETRIEVE | 9 | 4.5% |
 
-Phù hợp với phát hiện đã ghi ở `CLAUDE.md`: hầu hết câu hỏi thật trong `train.json` đều cần retrieval (đúng bản chất dữ liệu — câu hỏi tư vấn luật). Module vẫn hoạt động đúng logic (5 câu hỏi mang tính "phương pháp/tổ chức chung" được nhận diện đúng là không cần tra luật — xem case study §5).
-
-**`[ISSUP]`** (Self-RAG, giá trị thật — không bị lỗi §2):
+**`[ISSUP]`**:
 
 | Nhãn | Số câu | Tỷ lệ |
 |---|---:|---:|
-| FULLY_SUPPORTED | 150 | 70.4% |
-| PARTIALLY_SUPPORTED | 39 | 18.3% |
-| NOT_APPLICABLE (không có evidence) | 23 | 10.8% |
-| NOT_SUPPORTED | 1 | 0.5% |
+| FULLY_SUPPORTED | 128 | 63.4% |
+| NOT_APPLICABLE (không có evidence) | 37 | 18.3% |
+| PARTIALLY_SUPPORTED | 35 | 17.3% |
+| NOT_SUPPORTED | 2 | 1.0% |
 
-**`[ISUSE]`** (Self-RAG, giá trị thật):
+**`[ISUSE]`**:
 
 | Nhãn | Số câu | Tỷ lệ |
 |---|---:|---:|
-| USEFUL | 120 | 56.3% |
-| PARTIALLY_USEFUL | 81 | 38.0% |
-| NOT_USEFUL | 12 | 5.6% |
+| USEFUL | 125 | 61.9% |
+| PARTIALLY_USEFUL | 69 | 34.2% |
+| NOT_USEFUL | 8 | 4.0% |
 
 ### Ablation: `[ISREL]` có lọc bớt passage hay không ↔ chất lượng `[ISSUP]`
 
-Đây là phân tích ablation mạnh nhất hiện có — **hoàn toàn hợp lệ** vì chỉ dùng `self_support` (giá trị thật) và số lượng aid (đếm thuần, không qua judge):
+Vẫn là phân tích ablation mạnh nhất và hoàn toàn hợp lệ (chỉ dùng `issup_label` thật + đếm số aid, không qua judge của Notebook 4):
 
-| Nhóm | n | FULLY_SUPPORTED | PARTIALLY_SUPPORTED | NOT_APPLICABLE | NOT_SUPPORTED |
-|---|---:|---:|---:|---:|---:|
-| `[ISREL]` **không** lọc gì (giữ nguyên top-5) | 40 | 6 (15.0%) | 29 (72.5%) | 5 (12.5%) | 0 |
-| `[ISREL]` **có** lọc ≥1 passage | 173 | 144 (83.2%) | 10 (5.8%) | 18 (10.4%) | 1 (0.6%) |
+| Nhóm | n | FULLY_SUPPORTED | PARTIALLY_SUPPORTED | NOT_APPLICABLE | NOT_SUPPORTED | FULLY_SUPPORTED (loại NOT_APPLICABLE) |
+|---|---:|---:|---:|---:|---:|---:|
+| `[ISREL]` **không** lọc gì (giữ nguyên top-5) | 41 | 16 (39.0%) | 25 (61.0%) | 0 | 0 | 16/41 = 39.0% |
+| `[ISREL]` **có** lọc ≥1 passage | 152 | 112 (73.7%) | 10 (6.6%) | 28 (18.4%) | 2 (1.3%) | 112/124 = **90.3%** |
 
-**Đây là bằng chứng định lượng trực tiếp và mạnh cho luận điểm cốt lõi của Self-RAG**: khi module `[ISREL]` thực sự loại bỏ passage nhiễu, tỷ lệ câu trả lời được hỗ trợ đầy đủ bởi evidence (`FULLY_SUPPORTED`) tăng từ **15% lên 83.2%** — chênh lệch rất lớn, đáng để làm biểu đồ/callout riêng trong phần Results. Đây là kết quả nên **headline** trong báo cáo, vì nó không phụ thuộc vào phần dữ liệu bị lỗi ở §2.
+**Kết luận không đổi so với lần trước, thậm chí nhất quán trên một tập câu hỏi khác (202 câu, không trùng hoàn toàn với 213 câu lần trước)**: khi `[ISREL]` thực sự loại bỏ passage nhiễu, tỷ lệ câu trả lời được hỗ trợ đầy đủ (`FULLY_SUPPORTED`, loại các câu không có evidence để so sánh) tăng từ **39.0% lên 90.3%** — đây vẫn là kết quả headline mạnh nhất cho phần Results, và việc tái hiện được xu hướng này trên 2 lần chạy độc lập (lần trước 15%→83.2% trên 213 câu, lần này 39.0%→90.3% trên 202 câu, phương pháp tính rate hơi khác nhưng chiều hướng và độ lớn hiệu ứng giống hệt) càng làm tăng độ tin cậy của phát hiện này.
 
-## 5. Case study định tính — DÙNG ĐƯỢC (đã làm sạch `<think>`)
+## 5. Case study định tính — DÙNG ĐƯỢC
 
-### 5.1. Adaptive retrieval: `[Retrieve] = NO_RETRIEVE` đúng chỗ (5/213 câu)
+### 5.1. Adaptive retrieval: `[Retrieve] = NO_RETRIEVE` (9/202 câu, n tăng so với 5/213 lần trước)
 
 | qid | Câu hỏi | Lý do model đưa ra |
 |---|---|---|
-| 10614 | Nội dung thực hành chuyên môn của người phụ trách công tác dược lâm sàng gồm những gì? | "question about general professional duties, not legal regulation" |
-| 13009 | Xây dựng kế hoạch, chương trình đối thoại với thanh niên? | "Câu hỏi về lập kế hoạch chung, không liên quan đến quy định pháp luật" |
-| 14023 | Thành phần bản vẽ trong hồ sơ đồ án quy hoạch chuyên ngành hạ tầng kỹ thuật đô thị...? | "technical planning question, not legal regulation" |
-| 14790 | Điều tra, thu thập, đánh giá nguồn gen giống cây trồng lâm nghiệp như thế nào? | "question about general methodology, not legal regulation" |
-| 15779 | Các đơn vị nào giúp việc Giám đốc Học viện Chính trị quốc gia Hồ Chí Minh? | "question about organizational units, not legal regulation" |
+| 4000 | Nguyên tắc tổ chức bồi dưỡng bằng hiện vật như thế nào? | "không đề cập đến quy định pháp luật, quyền lợi hay thủ tục pháp lý" |
+| 1373 | Giải pháp tăng cường đổi mới cơ chế phân cấp ngân sách nhà nước... | "question about policy, not legal text" |
+| 14790 | Điều tra, thu thập, đánh giá nguồn gen giống cây trồng lâm nghiệp như thế nào? | "câu hỏi về quy trình khoa học, không liên quan đến pháp luật" |
+| 14832 | Các đơn vị sự nghiệp công lập nào thuộc Sở Tài nguyên và Môi trường? | "yêu cầu liệt kê đơn vị công lập, không liên quan đến quy định pháp luật cụ thể" |
+| 11417 | Định hướng nhập khẩu hàng hóa trong Chiến lược xuất nhập khẩu... | "định hướng chiến lược, không yêu cầu tra cứu văn bản luật cụ thể" |
+| 2184 | Người học cử nhân Răng Hàm Mặt ở nước ngoài phải thi đầu vào bao nhiêu bài? | "question about educational admission requirements, not legal" |
+| 11746 | Việc tổ chức thực hiện của Ban Chủ nhiệm Chương trình hỗ trợ doanh nghiệp... | "question about program organization, not legal regulation" |
+| 14121 | Nội dung nhiệm vụ quy hoạch phân khu xây dựng khu chức năng đặc thù... | "kiến thức chung về quy hoạch, không yêu cầu truy xuất văn bản luật cụ thể" |
+| 13009 | Xây dựng kế hoạch, chương trình đối thoại với thanh niên? | "question about general program planning, not legal regulation" |
 
-**Nhận xét quan trọng cho phần Discussion/Limitations**: nhìn kỹ 5 câu này, thực ra **đa số vẫn có thể tra cứu được trong corpus luật** (ví dụ cơ cấu tổ chức Học viện Chính trị quốc gia HCM thường được quy định trong quyết định/nghị định cụ thể) — mô hình có xu hướng gắn nhãn NO_RETRIEVE hơi rộng tay cho các câu hỏi *nghe* có vẻ về "quy trình/tổ chức chung" dù thực chất vẫn có căn cứ pháp lý. Đây là ví dụ thật cho hạn chế "self-critique không đảm bảo đúng tuyệt đối" đã nêu trong `SELF_RAG_SEMINAR_DETAILED_GUIDE.md` mục 12.5.
+**Nhận xét không đổi so với lần trước**: nhiều câu trong số này (ví dụ 14832 — cơ cấu tổ chức thường được quy định trong quyết định/thông tư cụ thể của Sở/Bộ) thực ra vẫn có thể có căn cứ pháp lý — mô hình có xu hướng gắn nhãn `NO_RETRIEVE` hơi rộng tay cho câu hỏi *nghe* như "quy trình/tổ chức chung". Ví dụ thật cho hạn chế "self-critique không đảm bảo đúng tuyệt đối".
 
-### 5.2. `[ISREL]` lọc nhiễu giúp câu trả lời súc tích và có căn cứ hơn
+### 5.2. Minh hoạ cụ thể cho lỗi §2 (dùng cho phần Implementation/Limitations, không phải Results)
 
-**qid 32** — "Số ngày tính lãi trong tháng đối với lãi suất tiền gửi... tại Kho bạc Nhà nước được xác định?"
-Retrieved 5 aid `[1017, 12802, 12803, 13126, 12801]` → sau `[ISREL]` còn đúng 1 aid liên quan `[1017]`.
+Hai ví dụ dưới đây **không nên dùng làm minh hoạ chất lượng hệ thống** (vì Correctness lúc đó bị lỗi), mà dùng để minh hoạ chính lỗi hạ tầng free-tier ở §2:
 
-> **Self-RAG**: "Số ngày tính lãi trong tháng đối với lãi suất tiền gửi tại Kho bạc Nhà nước được xác định bằng **số ngày thực tế của tháng**... **Tham khảo:** [1] (Văn bản: 18/2020/TT-BTC)." — `[ISSUP] = FULLY_SUPPORTED`
+- **qid 11575**: Standard RAG trả lời gần như trùng khớp gold answer (đúng Điều 86 NĐ 01/2021) nhưng bị chấm sai (`PARTIALLY_CORRECT` thay vì `CORRECT`) do judge bị mặc định.
+- **qid 1179**: Self-RAG trả lời "Bộ Xây dựng" mâu thuẫn trực tiếp với gold "UBND cấp tỉnh", cũng bị chấm sai (`PARTIALLY_CORRECT` thay vì `INCORRECT`) cùng lý do.
 
-> **Standard RAG** (cùng 5 aid thô, không lọc): "...được xác định là **số ngày thực tế của tháng**... [1]" — nội dung tương tự nhưng do đưa cả 5 văn bản (4 văn bản không liên quan) vào context, không có tín hiệu nào cho thấy model đã tự tin lọc bỏ nhiễu — về hình thức câu trả lời "trông giống nhau" nhưng Self-RAG có thêm tầng kiểm chứng tường minh (biết văn bản nào thực sự được dùng).
+### 5.3. `[ISREL]` lọc nhiễu (giữ nguyên từ lần phân tích trước, vẫn đúng vì không phụ thuộc Correctness)
 
-**qid 85** — minh hoạ rõ nhất vấn đề `<think>` không đóng: `standard_answer` của câu này **hoàn toàn là một khối suy luận dở dang, không có câu trả lời thật** (do bị cắt token giữa chừng) — trong khi `self_answer` cho cùng câu hỏi lại trả lời đầy đủ, có cấu trúc, trích dẫn `[1]` rõ ràng, `[ISSUP] = FULLY_SUPPORTED`. Đây là ví dụ tốt để minh hoạ hạn chế hạ tầng free-tier trong báo cáo (không phải do phương pháp Self-RAG kém hơn).
+**qid 32** — "Số ngày tính lãi trong tháng đối với lãi suất tiền gửi... tại Kho bạc Nhà nước được xác định?" Retrieved 5 aid → sau `[ISREL]` còn đúng 1 aid liên quan. `[ISSUP] = FULLY_SUPPORTED`, câu trả lời súc tích, có trích dẫn rõ ràng — đối lập với Standard RAG (giữ nguyên 5 aid thô, không có tầng lọc/kiểm chứng tường minh).
 
 ## 6. Việc cần làm trước khi chốt số liệu cuối cho báo cáo
 
-1. Trên Google Drive (thư mục `NLP-CS2308.CH203-data/artifacts/`), **xoá 2 file**: `evaluation_details.jsonl` và `final_comparison_table.csv`. Bắt buộc — nếu không xoá, cơ chế resume-safe của `04_evaluation_report.ipynb` sẽ coi 213 câu cũ là "đã xong" và **không chấm lại**, giữ nguyên số liệu lỗi.
-2. Mở `04_evaluation_report.ipynb` (đã vá `strip_think()` + đổi thứ tự `CANDIDATE_MODELS`), chạy lại từ đầu. **Không cần chạy lại Notebook 2/3.**
-3. Notebook sẽ tự in cỡ mẫu (`n = ...`) — kỳ vọng vẫn quanh 213 câu (trừ khi muốn chạy thêm 37 câu Self-RAG còn thiếu bằng cách chạy lại Notebook 3 trước).
-4. Sau khi có `final_comparison_table.csv` mới, đối chiếu lại `Correctness_rate` — nếu vẫn thấy một giá trị lặp lại bất thường ở tỷ lệ cao, báo lại để kiểm tra tiếp (có thể do quota cạn giữa chừng chứ không phải lỗi cũ).
-5. Ghi đè phần "Kết quả" trong báo cáo bằng bảng mới; **các phần §3 và §4 của tài liệu này (retrieval + ablation ISREL) không cần chờ chạy lại**, dùng thẳng được ngay.
+1. Trên Google Drive (`NLP-CS2308.CH203-data/artifacts/`), **xoá 2 file**: `evaluation_details.jsonl` và `final_comparison_table.csv`. Bắt buộc.
+2. **Chạy Notebook 4 vào lúc quota Groq free-tier còn nguyên** — tốt nhất là đầu một ngày mới, **không chạy ngay sau khi vừa chạy lại Notebook 2/3 trong cùng phiên**. Đây là bài học chính rút ra từ lỗi ở §2 (không phải lỗi code, mà là lỗi trình tự/thời điểm chạy).
+3. Cân nhắc đặt `MAX_QUESTIONS` ở §8 xuống một số vừa phải (ví dụ 100) thay vì `None` (chạy hết 202 câu) — thà có 100 câu chấm **thật** còn hơn 202 câu mà phần lớn bị mặc định. Có thể chạy nhiều lần liên tiếp (các ngày khác nhau) để cộng dồn tới khi đủ số câu mong muốn, nhờ cơ chế resume-safe.
+4. Sau khi chạy xong, **đọc kỹ output cuối cùng của cell §8** — nếu thấy dòng `CANH BAO: X/Y cau bi mac dinh...`, nghĩa là vẫn còn vấn đề quota, cần chạy lại vào lúc khác trước khi tin số liệu.
+5. Sau khi có `final_comparison_table.csv` sạch (không có cảnh báo), ghi đè phần "Kết quả" trong báo cáo; **§3 và §4 của tài liệu này (retrieval + ablation ISREL) dùng thẳng được ngay, không cần chờ**.
 
 ## 7. Mapping vào khung báo cáo (`SELF_RAG_SEMINAR_PROJECT_GUIDELINE.md` §28)
 
 | Mục báo cáo | Nội dung lấy từ đâu |
 |---|---|
-| Methodology | `PIPELINE.md` §3 (kiến trúc 3 hệ), §5 (lý do không fine-tune) |
-| Implementation | `PIPELINE.md` §4 (luồng dữ liệu), mô tả 4 module ở `03_self_rag_pipeline.ipynb`; **thêm mục phụ "Thách thức triển khai"** kể lại lỗi `<think>` ở §2 tài liệu này — đây là nội dung Implementation thật, đáng đưa vào |
-| Experiments | §1 (cỡ mẫu, kiểm tra tính đại diện), bảng dev-set/model ở `CLAUDE.md` |
-| Results | Bảng retrieval §3, bảng phân bố reflection §4, bảng ablation ISREL §4, `final_comparison_table.csv` (sau khi chạy lại theo §6) |
-| Discussion | Đánh đổi recall/precision (§3), nhận xét NO_RETRIEVE hơi rộng tay (§5.1), case qid 85 minh hoạ giới hạn hạ tầng free-tier (§5.2) |
-| Limitations | Lỗi `<think>` + giới hạn của `strip_think()` khi bị cắt cụt (§2), quota Groq free-tier khiến chỉ hoàn thành 213/250 câu (§1), self-critique không tuyệt đối chính xác (§5.1) |
-| Conclusion | Câu chốt đề xuất: cải thiện ISREL đáng kể mối liên hệ evidence–answer (15%→83.2% FULLY_SUPPORTED) là bằng chứng mạnh nhất cho giá trị của cơ chế self-reflection, dù có đánh đổi ở recall |
+| Methodology | `PIPELINE.md` §3 (kiến trúc 3 hệ), §5 (lý do không fine-tune, lịch sử đổi Gemini↔Groq) |
+| Implementation | `PIPELINE.md` §4 (luồng dữ liệu), mô tả 4 module ở `03_self_rag_pipeline.ipynb`; **thêm mục phụ "Thách thức triển khai"** kể lại cả 2 lỗi: `<think>` (§2 bản cũ, nay đã vá) và quota cạn giữa chừng làm hỏng judge (§2 tài liệu này) — cả hai đều là nội dung Implementation thật, đáng đưa vào như minh chứng cho khó khăn triển khai trên hạ tầng free-tier |
+| Experiments | §1 (cỡ mẫu), bảng dev-set/model ở `CLAUDE.md` |
+| Results | Bảng retrieval §3, bảng phân bố reflection §4, bảng ablation ISREL §4, `final_comparison_table.csv` (sau khi chạy lại sạch theo §6) |
+| Discussion | Đánh đổi recall/precision (§3), nhận xét NO_RETRIEVE hơi rộng tay (§5.1), ablation ISREL→ISSUP là luận điểm cốt lõi (§4) |
+| Limitations | Quota Groq free-tier hạn chế cỡ mẫu (202/250) và từng làm hỏng một lần chạy đánh giá hoàn toàn (§2) — minh hoạ rõ ràng cho ràng buộc hạ tầng free-tier nêu ở `PIPELINE.md` §5; lỗi `<think>` đã vá; self-critique không tuyệt đối chính xác (§5.1) |
+| Conclusion | Câu chốt đề xuất: cải thiện ISREL đáng kể mối liên hệ evidence–answer (39.0%→90.3% FULLY_SUPPORTED, tái hiện nhất quán qua 2 lần chạy độc lập) là bằng chứng mạnh nhất cho giá trị của cơ chế self-reflection, dù có đánh đổi ở recall |
