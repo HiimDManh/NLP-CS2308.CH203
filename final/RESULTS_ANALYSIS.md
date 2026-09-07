@@ -5,9 +5,10 @@ Tài liệu này tổng hợp số liệu thực tế từ `final/artifacts/` (p
 ## 0. Tóm tắt nhanh (đọc trước)
 
 - **Lỗi `<think>` (đã ghi nhận từ lần trước) nay gần như hết**: sau khi hạ ưu tiên `qwen/qwen3.6-27b` xuống cuối `CANDIDATE_MODELS`, tỷ lệ nhiễm `<think>` giảm còn 0/250 (Standard RAG), 0/202 (No-RAG), 7/202 = 3.5% (Self-RAG) — không còn là vấn đề đáng kể.
-- **Phát hiện 1 lỗi MỚI, nghiêm trọng hơn, chưa có trong lần phân tích trước**: `Correctness` của **cả 3 hệ**, và `Support`/`Usefulness` mới tính riêng cho No-RAG/Standard RAG trong `final_comparison_table.csv` hiện tại **không dùng được** — chỉ 2/202 câu là chấm thật, 200/202 câu (99%) rơi vào giá trị mặc định do hết quota Groq giữa chừng. Chi tiết + đã vá code ở §2.
-- **Số liệu dùng được ngay** (không bị ảnh hưởng bởi lỗi trên): toàn bộ chỉ số retrieval (Recall/Precision/MRR, có/không có `[ISREL]`), phân bố `[Retrieve]`/`[ISSUP]`/`[ISUSE]` thật của Self-RAG (từ Notebook 3, ghi thẳng vào `self_rag_results.jsonl`, không đi qua đoạn code bị lỗi của Notebook 4), và ablation `[ISREL]` → `[ISSUP]` vẫn cho thấy hiệu ứng rất mạnh (§4).
-- **Việc cần làm trước khi chốt số cho báo cáo**: xoá `evaluation_details.jsonl` + `final_comparison_table.csv`, chạy lại `04_evaluation_report.ipynb` (đã vá: tự dừng sớm khi hết quota + tự cảnh báo nếu có câu bị mặc định) **vào lúc quota Groq còn nhiều, tách riêng khỏi lần chạy Notebook 2/3** — chi tiết ở §6.
+- **Phát hiện 1 lỗi MỚI, nghiêm trọng hơn**: `Correctness` của **cả 3 hệ**, và `Support`/`Usefulness` mới tính riêng cho No-RAG/Standard RAG **không dùng được** khi quota Groq cạn giữa chừng — chỉ vài câu đầu là chấm thật, phần còn lại rơi vào giá trị mặc định mà không có cảnh báo. Đã vá code (dừng sớm + log `_reason` + tự cảnh báo) — chi tiết §2.
+- **Sửa lại chẩn đoán trên (quan trọng)**: chẩn đoán "hết quota theo ngày" ở trên **không chính xác**. Log lỗi thật thu được sau đó cho thấy nguyên nhân là **413 "Request too large"** (vượt giới hạn TPM — tokens per minute — của một request cụ thể, do `judge_support` ghép nguyên văn nhiều điều luật dài vào 1 lần gọi), **không phải hết ngân sách theo ngày**. Code cũ coi 413 giống mọi lỗi 4xx khác nên đánh dấu nhầm cả 3 model là "hỏng vĩnh viễn" chỉ vì 1 request quá khổ, khiến `model_queue()` trống oan và notebook dừng sớm dù quota thật vẫn còn nguyên. Đã sửa tận gốc — xem §2 (mục "Lỗi 413") bên dưới. **Khuyến nghị "chờ quota reset qua ngày hôm sau" ở các lần trả lời trước không còn cần thiết** — có thể chạy lại ngay sau khi vá.
+- **Số liệu dùng được ngay** (không bị ảnh hưởng bởi lỗi trên): toàn bộ chỉ số retrieval (Recall/Precision/MRR, có/không có `[ISREL]`), phân bố `[Retrieve]`/`[ISSUP]`/`[ISUSE]` thật của Self-RAG (từ Notebook 3, ghi thẳng vào `self_rag_results.jsonl`, không đi qua đoạn code bị lỗi của Notebook 4), và ablation `[ISREL]` → `[ISSUP]` vẫn cho thấy hiệu ứng rất mạnh (§4) — các số liệu này **không cần chờ** Correctness/Support/Usefulness được sửa xong.
+- **Việc cần làm trước khi chốt số cho báo cáo**: chạy lại `04_evaluation_report.ipynb` (đã vá lỗi 413 + cắt bớt độ dài evidence) — không cần chờ quota reset theo ngày như trước đây từng khuyến nghị nhầm. Chi tiết ở §6.
 
 ## 1. Cỡ mẫu thực tế (lần pull 07/09/2026)
 
@@ -55,9 +56,24 @@ Cả 2 ví dụ đều không thể giải thích bằng "judge chấm đúng nh
 2. **Lưu lại `_reason` của từng judge** (`norag_correctness_reason`, `standard_support_reason`, ...) vào `evaluation_details.jsonl` — trước đây không lưu, nên lần này phải soi tay câu trả lời mới phát hiện ra vấn đề.
 3. **Tự đếm và cảnh báo**: sau mỗi lần chạy, in dòng `CANH BAO: X/Y cau bi mac dinh toan bo...` nếu phát hiện câu nào có toàn bộ 6 judge đều trả về đúng reason mặc định — giúp phát hiện sự cố này ngay lập tức ở lần chạy tiếp theo, không cần phân tích thủ công như lần này.
 
-### Bài học rút ra cho việc chạy lại (đưa thẳng vào §6)
+### Cập nhật quan trọng: chẩn đoán "hết quota theo ngày" ở trên là SAI — nguyên nhân thật là lỗi 413
 
-Nguyên nhân sâu xa không phải lỗi code (đã đúng từ trước) mà là **thứ tự/thời điểm chạy**: dồn cả Notebook 2 + 3 + 4 trong cùng một phiên/ngày trên cùng một tài khoản Groq free-tier khiến notebook tốn quota nhiều nhất (Notebook 4, 6 lệnh/câu) luôn là nạn nhân cuối cùng hết quota. Nên **chạy Notebook 4 riêng, vào lúc quota còn nguyên** (ví dụ đầu ngày mới, chưa chạy gì khác).
+Sau khi vá 3 điểm trên và chạy lại, log lỗi thật thu được không phải "hết quota" mà là:
+
+```text
+Model openai/gpt-oss-120b loi khong the retry (status 413): Error code: 413 - {'error': {'message':
+'Request too large for model `openai/gpt-oss-120b` ... on tokens per minute (TPM): Limit 8000, Requested 12543 ...'}}
+```
+
+Cả 3 model trong `CANDIDATE_MODELS` đều báo 413 cho **cùng một request** (~11500-12500 token, vượt xa TPM 7000-8000 của cả 3 model) — đây là lỗi **kích thước của một request cụ thể** (gần như chắc chắn là `judge_support` ghép nguyên văn 5 điều luật dài vào `evidence_block`), **không phải hết ngân sách theo ngày**. TPM (tokens/phút) reset mỗi 60 giây, không phải hàng ngày — nên khuyến nghị "chờ qua ngày hôm sau" ở các câu trả lời trước là **sai**, dựa trên chẩn đoán nhầm.
+
+Lỗi nặng hơn nằm ở cách `chat()` xử lý 413: code cũ coi 413 giống mọi lỗi 4xx khác (`else: exhausted_models.add(model); break`), tức là **đánh dấu cả 3 model "hỏng vĩnh viễn cho cả phiên"** chỉ vì một request quá khổ — trong khi thực tế các model đó vẫn hoàn toàn dùng tốt cho các câu hỏi khác có request nhỏ hơn. Đây là lý do notebook "dừng sớm" (`DUNG SOM`) chỉ sau 2 câu dù quota thật sự vẫn còn nhiều.
+
+**Đã sửa tận gốc (04_evaluation_report.ipynb §4 + §2, tương tự cho Notebook 02/03)**:
+4. **`chat()` không còn đánh dấu model vào `exhausted_models` khi gặp lỗi 413** — chỉ chuyển sang model khác **cho câu hỏi hiện tại**; các model đó vẫn khả dụng bình thường cho câu hỏi tiếp theo.
+5. **`build_context()` cắt bớt mỗi điều luật về tối đa 1200 ký tự** (`MAX_CHUNK_CHARS`) trước khi ghép vào prompt judge — giảm hẳn khả năng một request vượt TPM ngay từ đầu.
+
+**Khuyến nghị vận hành đúng (thay thế khuyến nghị "chờ qua ngày" trước đó)**: chạy lại ngay sau khi vá, không cần chờ gì cả. Nếu vẫn thấy dòng `DUNG SOM`/`CANH BAO`, đọc kỹ thông báo lỗi gốc được in ra ngay phía trên (status code, message) trước khi kết luận nguyên nhân — 413 (kích thước request) và 429 với `Retry-After` dài (quota thật) là hai vấn đề khác nhau, cần xử lý khác nhau.
 
 ## 3. Số liệu retrieval — DÙNG ĐƯỢC (tính thuần Python, không qua LLM-judge, n=202)
 
@@ -141,11 +157,13 @@ Hai ví dụ dưới đây **không nên dùng làm minh hoạ chất lượng h
 
 ## 6. Việc cần làm trước khi chốt số liệu cuối cho báo cáo
 
-1. Trên Google Drive (`NLP-CS2308.CH203-data/artifacts/`), **xoá 2 file**: `evaluation_details.jsonl` và `final_comparison_table.csv`. Bắt buộc.
-2. **Chạy Notebook 4 vào lúc quota Groq free-tier còn nguyên** — tốt nhất là đầu một ngày mới, **không chạy ngay sau khi vừa chạy lại Notebook 2/3 trong cùng phiên**. Đây là bài học chính rút ra từ lỗi ở §2 (không phải lỗi code, mà là lỗi trình tự/thời điểm chạy).
-3. Cân nhắc đặt `MAX_QUESTIONS` ở §8 xuống một số vừa phải (ví dụ 100) thay vì `None` (chạy hết 202 câu) — thà có 100 câu chấm **thật** còn hơn 202 câu mà phần lớn bị mặc định. Có thể chạy nhiều lần liên tiếp (các ngày khác nhau) để cộng dồn tới khi đủ số câu mong muốn, nhờ cơ chế resume-safe.
-4. Sau khi chạy xong, **đọc kỹ output cuối cùng của cell §8** — nếu thấy dòng `CANH BAO: X/Y cau bi mac dinh...`, nghĩa là vẫn còn vấn đề quota, cần chạy lại vào lúc khác trước khi tin số liệu.
-5. Sau khi có `final_comparison_table.csv` sạch (không có cảnh báo), ghi đè phần "Kết quả" trong báo cáo; **§3 và §4 của tài liệu này (retrieval + ablation ISREL) dùng thẳng được ngay, không cần chờ**.
+1. Chạy lại `04_evaluation_report.ipynb` (đã vá lỗi 413 + cắt bớt độ dài evidence) — **không cần chờ quota reset qua ngày khác**, khuyến nghị đó dựa trên chẩn đoán sai (xem mục đính chính ở §2). Không cần xoá `evaluation_details.jsonl`/`final_comparison_table.csv` trước, cơ chế resume-safe sẽ tự tiếp tục từ chỗ dừng.
+2. Sau khi chạy xong, **đọc kỹ output cuối cùng của cell §8**:
+   - Nếu thấy log lỗi có `status 413` — không nên còn xảy ra nữa sau khi vá, nhưng nếu vẫn thấy, có thể cần giảm `MAX_CHUNK_CHARS` trong `build_context()` xuống thấp hơn 1200.
+   - Nếu thấy log lỗi `RateLimitError`/429 với `Retry-After` dài (hàng trăm giây) lặp lại liên tục — đây mới thực sự là dấu hiệu hết quota theo giờ/ngày, lúc đó khuyến nghị "đợi" mới áp dụng.
+   - Nếu thấy `CANH BAO: X/Y cau bi mac dinh...` — vẫn còn vấn đề parse JSON, kiểm tra `_reason` trong `evaluation_details.jsonl` để biết chi tiết.
+3. Nếu chạy trơn tru (không có 2 loại cảnh báo trên), có thể đặt `MAX_QUESTIONS = None` để chạy hết một lượt tất cả các câu còn thiếu trong `final_qids`.
+4. Sau khi có `final_comparison_table.csv` sạch (không có cảnh báo, `So_cau` đủ lớn để có ý nghĩa thống kê — tối thiểu vài chục câu), ghi đè phần "Kết quả" trong báo cáo; **§3 và §4 của tài liệu này (retrieval + ablation ISREL) dùng thẳng được ngay, không cần chờ**.
 
 ## 7. Mapping vào khung báo cáo (`SELF_RAG_SEMINAR_PROJECT_GUIDELINE.md` §28)
 
