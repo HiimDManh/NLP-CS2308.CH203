@@ -174,13 +174,15 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung báo cáo guideline §28):
 
 1. **Hệ thống chạy được** (notebook 01-04, tái chạy được từ đầu trên Colab free): nhập một câu hỏi pháp luật tiếng Việt, hệ Self-RAG-inspired trả về câu trả lời + danh sách điều luật trích dẫn (`law_id`, số điều) + reflection report (Retrieve/ISREL/ISSUP/ISUSE).
-2. **Bảng so sánh định lượng 3 hệ thống** (`final_comparison_table.csv`, notebook 04) — trên phần giao nhau các câu đã chạy xong cả 3 hệ (không nhất thiết đủ 250 câu, tùy quota Groq free tier còn lại khi chạy):
+2. **Bảng so sánh định lượng 3 hệ thống** (`final_comparison_table.csv`, notebook 04) — trên phần giao nhau các câu đã chạy xong cả 3 hệ (n=187/250, giới hạn free-tier Groq — xem `RESULTS_ANALYSIS.md`, dữ liệu đã kiểm chứng và dùng được cho báo cáo, số liệu chốt ngày 09/09/2026):
 
    | Hệ thống | Recall | Precision | MRR | Correctness_rate/score | Support_rate | Usefulness_rate/score |
    |---|---|---|---|---|---|---|
-   | No-RAG | — | — | — | ? | — (N/A, không có evidence) | ? |
-   | Standard RAG | ? | ? | ? | ? | ? | ? |
-   | Self-RAG-inspired | ? (sau ISREL) | ? (sau ISREL) | ? | ? | ? | ? |
+   | No-RAG | — | — | — | 16.0% / 0.441 | — (N/A, không có evidence) | 50.8% / 0.749 |
+   | Standard RAG | 0.497 | 0.127 | 0.421 | 25.7% / 0.444 | 53.5% | 25.7% / 0.497 |
+   | Self-RAG-inspired | 0.425 (sau ISREL) | 0.280 (sau ISREL) | 0.422 | **33.2% / 0.551** | **62.0%** | **62.6% / 0.791** |
+
+   Self-RAG-inspired thắng cả 2 baseline trên mọi chỉ số chất lượng câu trả lời. Điểm đáng chú ý: Standard RAG có Usefulness thấp hơn cả No-RAG (hay từ chối trả lời khi 5 điều luật cố định không đủ liên quan) — Self-RAG giải quyết nghịch lý này nhờ `[ISREL]` lọc bớt nhiễu trước khi generate. Chi tiết diễn giải ở `RESULTS_ANALYSIS.md` §3.
 
    Notebook 04 cũng in ra so sánh Recall **trước/sau** `[ISREL]` của Self-RAG — bằng chứng định lượng cho việc lọc nhiễu có giữ được evidence đúng hay không.
 
@@ -195,8 +197,8 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
 - [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `openai/gpt-oss-120b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [x] `03_self_rag_pipeline.ipynb` — 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE), sinh `self_rag_results.jsonl`.
-- [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`. **Đã vá 3 lỗi riêng biệt (xem `RESULTS_ANALYSIS.md`): lỗi `<think>` (26/08/2026, đã giảm hẳn), lỗi dừng sớm khi judge bị mặc định hàng loạt (07/09/2026, thêm log `_reason` + cảnh báo tự động), và lỗi 413 "Request too large" bị hiểu nhầm thành hết quota (07/09/2026, sửa `chat()` không đánh dấu model hỏng vì 413 + cắt bớt độ dài evidence)** — cần xoá `evaluation_details.jsonl`/`final_comparison_table.csv` cũ trên Drive rồi chạy lại notebook này (không cần chờ quota reset) trước khi dùng số liệu Correctness/Support/Usefulness cho báo cáo.
-- [x] `RESULTS_ANALYSIS.md` — phân tích kết quả từ lần pull mới nhất (hiện tại: 07/09/2026, 202/250 câu): số liệu retrieval + ablation `[ISREL]` dùng được ngay (kết quả tái hiện nhất quán qua 2 lần pull độc lập), phát hiện/sửa lỗi quota-cạn khiến Correctness toàn bộ vô nghĩa, case study cụ thể, mapping vào khung báo cáo §28. **Tài liệu này được viết lại (không phải nối thêm) mỗi lần có pull artifacts mới — luôn đọc lại bản mới nhất, đừng giả định số mục §... giữ nguyên giữa các lần.**
+- [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`. Đã vá 3 lỗi riêng biệt (xem `RESULTS_ANALYSIS.md` §7): lỗi `<think>` (26/08/2026), lỗi dừng sớm khi judge bị mặc định hàng loạt (07/09/2026), và lỗi 413 "Request too large" bị hiểu nhầm thành hết quota (07/09/2026). **Lần pull 09/09/2026 (187/250 câu) là lần đầu tiên dữ liệu Correctness/Support/Usefulness đáng tin cậy — đã kiểm chứng chất lượng, dùng được cho báo cáo, không cần chạy lại nữa.**
+- [x] `RESULTS_ANALYSIS.md` — phân tích kết quả từ lần pull mới nhất (hiện tại: 09/09/2026, 187/250 câu, **dữ liệu cuối cùng dùng cho báo cáo**): bảng so sánh chính (Self-RAG thắng cả 3 chỉ số Correctness/Support/Usefulness), số liệu retrieval + ablation `[ISREL]` (tái hiện nhất quán qua 3 lần pull độc lập), phát hiện nghịch lý Usefulness của Standard RAG (thấp hơn cả No-RAG do hay từ chối trả lời), case study cụ thể với `_reason` thật của judge, mapping vào khung báo cáo §28. **Tài liệu này được viết lại (không phải nối thêm) mỗi lần có pull artifacts mới — luôn đọc lại bản mới nhất, đừng giả định số mục §... giữ nguyên giữa các lần.**
 - [x] Demo — mục "11. Demo" trong `03_self_rag_pipeline.ipynb`, đặt **ngay sau Orchestrator (§10) và trước vòng lặp dev set nặng (§12)** một cách có chủ đích: muốn demo (ví dụ lúc báo cáo cuối kỳ) chỉ cần chạy notebook từ đầu tới hết §11 (Colab: chuột phải cell demo → "Run before"), không phải đợi qua vòng lặp 250 câu ở §12. Sửa `DEMO_QUESTIONS` rồi chạy lại cell là ra ngay answer + nguồn trích dẫn + reflection report.
 - [x] ~~`05_drill_submission.ipynb`~~ — **đã hủy**. Fetch trang chính thức https://vlsp.org.vn/vlsp2025/eval/drill xác nhận hạn nộp hệ thống là **12/08/2025 23:59 UTC** (nộp qua Codabench, chấm bằng Recall/Precision/Macro-F2) — đã qua hơn 1 năm tính đến thời điểm làm đồ án này, không còn đường nộp thật. Quyết định (do người dùng chọn): dừng hẳn, không build notebook dự đoán trên `public_test.json`/`private_test.json` nữa, tập trung thời gian còn lại cho báo cáo/slide.
 - [ ] Báo cáo + slide (tái sử dụng nội dung từ `seminar/SELF_RAG_SEMINAR_DETAILED_GUIDE.md` cho phần liên quan tới paper gốc).
