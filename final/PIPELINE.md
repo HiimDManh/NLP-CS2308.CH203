@@ -73,7 +73,7 @@ final/
 │   ├── 02_generator_baseline.ipynb   [ĐÃ CÓ]
 │   ├── 03_self_rag_pipeline.ipynb    [ĐÃ CÓ]
 │   ├── 04_evaluation_report.ipynb    [ĐÃ CÓ]
-│   (05_drill_submission.ipynb — ĐÃ HỦY, xem §8: hạn nộp VLSP2025 DRiLL 12/08/2025 đã qua)
+│   (05_drill_submission.ipynb — ĐÃ HỦY, xem §9: hạn nộp VLSP2025 DRiLL 12/08/2025 đã qua)
 └── artifacts/              # SINH RA từ notebook, không commit git (.gitignore)
     ├── chunks.faiss                  # FAISS index của ~60k chunk điều luật
     ├── chunks_meta.json              # metadata chunk (aid, law_id, text)
@@ -148,7 +148,7 @@ Phải chạy theo đúng thứ tự vì mỗi notebook phụ thuộc artifact c
 2. `02_generator_baseline.ipynb` → dùng lại index từ bước 1, cần secret `GROQ_API_KEY` (Colab Secrets, không hardcode trong notebook) → sinh `standard_rag_results.jsonl`, checkpoint theo từng câu nên an toàn khi bị ngắt session giữa chừng.
 3. `03_self_rag_pipeline.ipynb` → thêm 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE) lên trên cùng hạ tầng retrieve/generate → sinh `self_rag_results.jsonl`. Tốn ~5 lần gọi API/câu hỏi (so với 1 lần ở bước 2), nên thử `MAX_QUESTIONS` nhỏ trước khi chạy full dev set.
 4. `04_evaluation_report.ipynb` → không phụ thuộc GPU/embedding; sinh thêm Hệ 1 (No-RAG), rồi chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau các câu đã xong (không giả định đủ 250 câu) → xuất `final_comparison_table.csv`.
-~~5. `05_drill_submission.ipynb`~~ — đã hủy, xem §8.
+~~5. `05_drill_submission.ipynb`~~ — đã hủy, xem §9.
 
 ### 6.4. Xử lý sự cố Colab thường gặp
 
@@ -189,16 +189,113 @@ Khi hoàn thành, đồ án gồm các thành phần sau (ánh xạ vào khung b
 3. **Phân tích case cụ thể**: ví dụ câu hỏi mà Self-RAG-inspired lọc được điều luật nhiễu (RAG chuẩn không lọc), và ví dụ câu hỏi mà self-critique phát hiện answer không được hỗ trợ (hallucination) — dùng cho phần Discussion của báo cáo.
 4. **Báo cáo cuối kỳ** theo khung §28 của guideline (Introduction → Related Work → Methodology → Implementation → Experiments → Results → Discussion → Conclusion), dùng trực tiếp bảng/case ở trên.
 5. **Demo** chạy trực tiếp trong Colab (nhập câu hỏi trong 1 cell, hoặc UI Gradio đơn giản nếu có thời gian).
-6. ~~Nộp lên leaderboard VLSP2025 DRiLL~~ — đã hủy: hạn nộp hệ thống là 12/08/2025, đã qua từ lâu tính đến thời điểm làm đồ án (xem §8).
+6. ~~Nộp lên leaderboard VLSP2025 DRiLL~~ — đã hủy: hạn nộp hệ thống là 12/08/2025, đã qua từ lâu tính đến thời điểm làm đồ án (xem §9).
 
-## 8. Trạng thái hiện tại
+## 8. Giải thích chi tiết từng notebook (chuẩn bị hỏi đáp khi bảo vệ)
+
+Mục này đi sâu vào **cách từng notebook hoạt động và vì sao lại thiết kế như vậy**, dùng để trả lời khi giảng viên hỏi xoáy vào pipeline. Mỗi notebook có 3 phần: *Mục đích & luồng xử lý*, *Quyết định thiết kế quan trọng (kèm lý do)*, và *Câu hỏi thường gặp*.
+
+### 8.1. Notebook 01 — `01_retrieval_baseline.ipynb`
+
+**Mục đích & luồng xử lý**: biến `legal_corpus.json` (2157 văn bản, 59636 điều luật) thành một FAISS index có thể tìm kiếm ngữ nghĩa, rồi đo chất lượng retrieval thuần (chưa có generation).
+
+1. **Chunking**: bộ tách ưu tiên tách theo đoạn/khoản có sẵn trong văn bản luật (paragraph-first); nếu một điều luật không có cấu trúc đoạn rõ ràng hoặc quá dài, dùng fallback cắt cố định 800 ký tự, overlap 150 ký tự (overlap để tránh cắt đứt ý ngay ranh giới chunk).
+2. **Embedding**: mỗi chunk được encode bằng `bkai-foundation-models/vietnamese-bi-encoder` (Sentence-BERT dạng bi-encoder, encode câu hỏi và điều luật độc lập thành vector rồi so bằng similarity — khác cross-encoder phải chạy cặp (câu hỏi, điều luật) cùng lúc, không khả thi khi cần so 1 câu hỏi với 59636 điều luật). Vector được **chuẩn hoá (normalize)** trước khi lưu.
+3. **Index**: FAISS `IndexFlatIP` (Inner Product trên vector đã chuẩn hoá = cosine similarity). `Flat` nghĩa là tìm kiếm brute-force chính xác tuyệt đối (không xấp xỉ như HNSW/IVF) — chấp nhận được vì quy mô ~60k vector vẫn đủ nhanh trên CPU, không cần đánh đổi độ chính xác lấy tốc độ.
+4. **Retrieve**: với mỗi câu hỏi, lấy `top_chunks=50` chunk gần nhất theo cosine similarity, sau đó **khử trùng theo `aid`** (một điều luật có thể bị chia thành nhiều chunk, hoặc nhiều chunk khác nhau map về cùng điều luật) để chỉ giữ `max_k=5` **điều luật khác nhau** đầu tiên — tránh việc "top-5 kết quả" thực chất chỉ là 2-3 điều luật lặp lại.
+5. **Dev split**: tách cố định 250 câu từ `train.json` bằng `random.seed(42)`, lưu lại `dev_split_qids.json` — mọi notebook sau đọc lại đúng file này để đảm bảo cả 3 hệ được so sánh trên **cùng một tập câu hỏi**, không phải suy luận lại từ đầu mỗi lần.
+6. **Đánh giá**: Recall@5 (top-5 có chứa **ít nhất 1** `aid` đúng không), Precision@5 (bao nhiêu % trong top-5 là đúng), MRR (vị trí của kết quả đúng đầu tiên, nghịch đảo rồi lấy trung bình).
+
+**Quyết định thiết kế quan trọng**:
+- Dùng **bi-encoder** thay vì cross-encoder rerank: vì cross-encoder chính xác hơn nhưng phải chạy inference cho từng cặp (câu hỏi, điều luật) — không khả thi ở quy mô 60k điều luật/câu hỏi trên Colab free. Đây là hạn chế đã biết, có thể nêu ở phần Limitations/Future work ("thêm tầng rerank bằng cross-encoder cho top-50 trước khi chọn top-5 cuối").
+- Chọn `bkai-foundation-models/vietnamese-bi-encoder` (không phải multilingual model tổng quát): model này pretrain/fine-tune riêng cho tiếng Việt, cho similarity chính xác hơn multilingual model chung chung với văn bản pháp luật (nhiều từ Hán-Việt, cấu trúc câu đặc thù).
+- `top_chunks=50` rồi mới lọc còn `max_k=5`: đảm bảo đủ ứng viên để khử trùng `aid` mà vẫn còn đủ 5 điều luật khác nhau (nếu chỉ lấy top-5 chunk thô ngay từ đầu, có thể chỉ còn 2-3 điều luật khác nhau do trùng lặp).
+
+**Câu hỏi thường gặp**:
+- *"Tại sao không dùng model retrieval học sẵn end-to-end (như DPR)?"* — Không đủ dữ liệu cặp (câu hỏi, điều luật đúng) để fine-tune riêng một retriever cho domain pháp luật trong khuôn khổ đồ án; dùng bi-encoder pretrained sẵn (zero-shot) là lựa chọn thực tế cho quy mô đồ án.
+- *"Recall@5 chỉ ~0.5 có thấp không?"* — Đúng là còn thấp nếu đứng riêng, nhưng đây là **giới hạn tầng retrieval** (không phải lỗi), và chính giới hạn này tạo động lực cho `[ISREL]` ở Hệ 3: lọc nhiễu trong top-5 sẵn có, không thể tạo ra evidence không nằm trong top-5 ngay từ đầu — đây cũng là lý do Self-RAG **giảm Recall** so với Standard RAG (đã phân tích ở `RESULTS_ANALYSIS.md`).
+
+### 8.2. Notebook 02 — `02_generator_baseline.ipynb` (Hệ 2 — Standard RAG)
+
+**Mục đích & luồng xử lý**: baseline RAG "chuẩn" — luôn lấy đúng top-5 điều luật (không lọc, không tự đánh giá gì thêm) rồi generate thẳng.
+
+1. Load lại FAISS index + `dev_split_qids.json` từ Notebook 01 (không build lại).
+2. Với mỗi câu hỏi: `retrieve()` lấy 5 điều luật → ghép vào `PROMPT_TEMPLATE` (câu hỏi + context) → gọi LLM qua Groq → lưu câu trả lời + `retrieved_aids` vào `standard_rag_results.jsonl`.
+3. Checkpoint theo từng câu (ghi JSONL, `flush()` ngay) — nếu Colab bị ngắt giữa chừng, chạy lại tự bỏ qua câu đã xong.
+
+**Quyết định thiết kế quan trọng**:
+- **Prompt ép model từ chối khi thiếu căn cứ** ("nếu các điều luật không đủ thông tin, hãy nói rõ không đủ căn cứ thay vì suy đoán") thay vì để model tự do trả lời: mục đích là giảm hallucination và tạo điều kiện để `[ISSUP]` ở Notebook 4 có thể phân biệt được câu trả lời có bám evidence hay không. Đây cũng chính là nguyên nhân của "nghịch lý Usefolness" phát hiện được ở `RESULTS_ANALYSIS.md` — khi cả 5 điều luật không liên quan, Standard RAG từ chối trả lời thay vì bịa, nên trung thực hơn nhưng bị chấm kém hữu ích hơn.
+- **Không hardcode tên model** (`CANDIDATE_MODELS` + `client.models.list()`): vì đã gặp thật lỗi `model_not_found` dù Groq tài liệu ghi model đó là "production" — quyền truy cập model thay đổi theo tài khoản/thời điểm.
+- **Rate-limit 2 tầng**: `Retry-After` ngắn (giây) → chờ; dài (hàng trăm giây, lặp lại) → hiểu là quota giờ/ngày của **model đó** đã cạn, tự động xoay sang model tiếp theo trong `CANDIDATE_MODELS` (không phải chờ vô ích).
+- **Vì sao cần API key/Groq**: xem giải thích chi tiết ở lượt hỏi trước (tóm tắt: sinh câu trả lời tiếng Việt tự nhiên không thể làm bằng rule-based, và Colab free không đủ mạnh để tự host một LLM đủ tốt).
+
+**Câu hỏi thường gặp**:
+- *"Tại sao Standard RAG luôn dùng đúng 5 điều luật dù có thể không liên quan?"* — Đây chính là điểm baseline: mô phỏng RAG "ngây thơ" kinh điển (retrieve cố định rồi generate), làm nền để so sánh với Self-RAG có thêm bước lọc `[ISREL]`.
+- *"Vì sao không dùng OpenAI/Anthropic mà dùng Groq?"* — Groq free tier không yêu cầu khai báo billing (đã thử Gemini, bị bắt setup billing); phù hợp ràng buộc "không tốn tiền" của đồ án sinh viên.
+
+### 8.3. Notebook 03 — `03_self_rag_pipeline.ipynb` (Hệ 3 — Self-RAG-inspired, hệ chính)
+
+**Mục đích & luồng xử lý**: thêm 4 module phản tư (mô phỏng reflection tokens của paper) lên trên cùng hạ tầng retrieve/generate.
+
+```text
+Question -> [Retrieve] -> (nếu RETRIEVE) retrieve top-5 -> [ISREL] lọc -> Generate (adaptive) -> [ISSUP] -> [ISUSE]
+```
+
+1. **`[Retrieve]` (`judge_retrieve`)**: 1 lệnh gọi LLM, hỏi "câu này có cần tra luật không?" → `RETRIEVE`/`NO_RETRIEVE`. Mặc định an toàn khi parse lỗi: `RETRIEVE` (thà tra thừa còn hơn bỏ sót, vì đa số câu hỏi thật trong `train.json` đều cần).
+2. **Retrieve** (nếu `RETRIEVE`): giống hệt Notebook 01/02, lấy top-5.
+3. **`[ISREL]` (`judge_relevance_batch`)**: **1 lệnh gọi duy nhất cho cả 5 điều luật** (không phải 5 lệnh riêng như paper mô tả) — model trả về JSON list gồm 5 nhãn `RELEVANT`/`IRRELEVANT`. Mặc định an toàn: `RELEVANT` (không âm thầm bỏ evidence chỉ vì parse lỗi).
+4. **Generate (`generate_answer`, thích ứng)**: nếu còn điều luật sau lọc → `WITH_CONTEXT_PROMPT`; nếu không (do `NO_RETRIEVE` hoặc `[ISREL]` lọc sạch) → `NO_CONTEXT_PROMPT` (trả lời từ kiến thức chung, tự nói rõ không có trích dẫn cụ thể). Đây là điểm khác biệt hành vi thật so với Standard RAG (luôn có context cố định).
+5. **`[ISSUP]` (`judge_support`)**: chỉ gọi khi có evidence còn lại; nếu không có evidence, gán thẳng `NOT_APPLICABLE` (không hỏi LLM đánh giá support với evidence rỗng — vô nghĩa).
+6. **`[ISUSE]` (`judge_usefulness`)**: luôn gọi, không phụ thuộc có evidence hay không (đánh giá trải nghiệm người hỏi độc lập với việc có trích dẫn).
+7. Ghi tất cả vào `self_rag_results.jsonl` (checkpoint theo câu, resume-safe).
+
+**Quyết định thiết kế quan trọng**:
+- **`[ISREL]` gộp thành 1 lệnh gọi batch** (không làm đúng như paper — đánh giá độc lập từng passage): đánh đổi có chủ đích, vì mỗi câu hỏi đã tốn ~5 lệnh gọi (Retrieve + ISREL + Generate + ISSUP + ISUSE), nếu tách ISREL thành 5 lệnh riêng sẽ thành ~9 lệnh/câu — áp lực rate-limit free-tier không chịu nổi ở quy mô 250 câu.
+- **`chat()` là hàm generic** (nhận prompt bất kỳ) thay vì viết riêng cho từng module: vì cả 4 module + generator đều cần cùng cơ chế gọi API + rate-limit-failover, tách hàm dùng chung tránh lặp code 5 lần.
+- **Mặc định an toàn khác nhau cho từng module khi parse JSON lỗi** — không phải ngẫu nhiên: `RETRIEVE` (thà thừa), `RELEVANT` (thà giữ), đều thiên về "không mất thông tin" hơn là "chính xác tuyệt đối" — triết lý: một lỗi parse ngẫu nhiên không nên làm mất hẳn khả năng trả lời của cả pipeline.
+- **Mục Demo (§11) đặt ngay sau Orchestrator (§10), trước vòng lặp 250 câu (§12)**: để demo trực tiếp lúc bảo vệ chỉ cần `Runtime > Run before` tới cell demo, không phải đợi/tốn quota chạy hết 250 câu.
+
+**Câu hỏi thường gặp**:
+- *"Vì sao không tự sinh reflection token bằng cách fine-tune như paper gốc?"* — Trả lời bằng lý do ở §5 (Colab free không đủ để train + host critic model 7B+); đồ án mô phỏng bằng prompting một LLM instruction-following có sẵn, đóng vai "giám khảo" — đánh đổi: không cần dữ liệu huấn luyện + không cần GPU train, nhưng chất lượng judge phụ thuộc hoàn toàn vào khả năng làm theo prompt của model có sẵn (không được huấn luyện chuyên biệt cho việc này).
+- *"Reflection token trong code có đúng 4 loại như paper không?"* — Đúng cả 4 (`Retrieve`, `ISREL`, `ISSUP`, `ISUSE`), nhưng bỏ token `Continue`/multi-segment của paper (paper còn dùng để quyết định retrieve tiếp giữa chừng khi sinh đoạn dài) — đồ án chỉ làm quyết định retrieve **một lần** ở đầu, phù hợp với câu hỏi QA ngắn (không phải sinh văn bản dài nhiều đoạn).
+- *"Tại sao Self-RAG lại có Recall thấp hơn Standard RAG?"* — Vì `[ISREL]` lọc dựa trên **cùng top-5** đã lấy ở bước retrieve (không lấy thêm evidence mới), nên chỉ có thể giữ nguyên hoặc giảm số điều luật đúng, không thể tăng — đây là đánh đổi Precision-Recall thật đã đo được (xem `RESULTS_ANALYSIS.md` §4).
+
+### 8.4. Notebook 04 — `04_evaluation_report.ipynb` (đánh giá & so sánh 3 hệ)
+
+**Mục đích & luồng xử lý**: không retrieval/embedding gì thêm — chỉ tổng hợp, sinh thêm Hệ 1 (No-RAG), rồi chấm điểm hậu kiểm thống nhất.
+
+1. **Tính giao (`common_qids`)**: lấy phần giao `qid` giữa `standard_rag_results.jsonl` và `self_rag_results.jsonl` (không giả định đủ 250 câu, vì rate-limit có thể khiến 2 notebook trước hoàn thành số câu khác nhau).
+2. **Sinh No-RAG** ngay trong notebook này (không có notebook riêng vì đây là hệ đơn giản nhất — chỉ hỏi thẳng LLM, không cần retrieve gì): tái dùng đúng `NO_CONTEXT_PROMPT` của Notebook 03 để đảm bảo nhất quán phương pháp giữa các hệ.
+3. **Giao lại lần 2 (`final_qids`)**: giao `common_qids` với các câu No-RAG đã sinh xong → đây là tập câu hỏi **cuối cùng** dùng để so sánh cả 3 hệ, đảm bảo công bằng (apple-to-apple, cùng 1 tập câu hỏi cho cả 3).
+4. **Dựng lại text điều luật từ `aid`**: `standard_rag_results.jsonl` chỉ lưu `retrieved_aids` (số), không lưu nguyên văn — phải tra lại `legal_corpus.json` để có text làm evidence khi chấm `[ISSUP]` cho Standard RAG.
+5. **3 judge hậu kiểm áp dụng thống nhất cho cả 3 hệ**:
+   - `judge_correctness` (**mới**, Notebook 02/03 chưa có): so trực tiếp với `answer` gold (văn bản tự do do người viết, không phải đoạn trích) — **tính mới hoàn toàn cho cả 3 hệ**.
+   - `judge_support`/`judge_usefulness`: **tính lại (fresh)** cho No-RAG (support luôn `NOT_APPLICABLE`) và Standard RAG (evidence dựng lại từ `retrieved_aids`), nhưng **tái dùng nguyên** `issup_label`/`isuse_label` đã có sẵn từ Notebook 03 cho Self-RAG — có chủ đích, không phải thiếu sót: cùng prompt/temperature=0 đã tính rồi, tính lại chỉ tốn thêm API call mà không đổi kết quả.
+6. Xuất `evaluation_details.jsonl` (chi tiết từng câu, cả 3 hệ) + `final_comparison_table.csv` (bảng tổng hợp, có cả `*_rate` — tỷ lệ đạt nhãn tốt nhất — và `*_score` — điểm trọng số 1/0.5/0, sắc thái hơn khi phần lớn câu chỉ đạt "một phần").
+7. Tính lại Recall/Precision/MRR **thuần Python** (không qua LLM) cho Standard RAG và Self-RAG **cả trước lẫn sau `[ISREL]`** — đây là cơ sở cho ablation chính của đồ án.
+
+**Quyết định thiết kế quan trọng**:
+- **Vì sao chấm lại Correctness/Support/Usefulness ở một notebook riêng thay vì làm ngay trong Notebook 02/03?** Vì cần một bộ tiêu chí **thống nhất** áp dụng đồng đều cho cả 3 hệ (kể cả No-RAG, hệ chưa tồn tại lúc Notebook 02/03 chạy) — làm riêng lẻ trong từng notebook sẽ không so sánh được công bằng.
+- **Vì sao Correctness dùng LLM-judge thay vì so khớp chuỗi (BLEU/ROUGE/exact match)?** `answer` trong `train.json` là văn bản tư vấn tự do do người viết (không phải đoạn trích nguyên văn từ luật), nên hai câu trả lời có thể **đúng cùng một ý nghĩa pháp lý** dù diễn đạt hoàn toàn khác câu chữ — metric lexical overlap (BLEU/ROUGE) sẽ chấm sai trong trường hợp này. LLM-judge có thể so sánh **kết luận pháp lý cốt lõi**, không cần trùng từ ngữ (ghi rõ trong `CORRECTNESS_PROMPT`).
+- **Đã gặp 3 lỗi thật khi xây notebook này** (đáng kể nhất trong toàn bộ đồ án, nên chuẩn bị kỹ nếu giảng viên hỏi về "khó khăn gặp phải"):
+  1. Model "thinking" `qwen/qwen3.6-27b` bọc `<think>...</think>` trước output, làm hỏng cả answer lẫn JSON parse của judge — phát hiện qua thống kê bất thường (100% câu trả lời cùng 1 nhãn, không thể xảy ra nếu judge chấm thật). Sửa bằng `strip_think()`.
+  2. Khi tất cả model bị khóa (rate-limit dài hạn), vòng lặp cũ **không dừng** mà tiếp tục ghi hàng trăm dòng giá trị mặc định — làm bảng kết quả trông hợp lệ nhưng gần như toàn bộ là rác. Sửa: dừng sớm + log `_reason` + cảnh báo tự động.
+  3. Lỗi **413 "Request too large"** (một request cụ thể — `evidence_block` ghép 5 điều luật dài — vượt giới hạn token/phút của Groq) từng bị hiểu nhầm thành hết quota theo ngày, khiến code đánh dấu nhầm cả 3 model "hỏng vĩnh viễn". Sửa: 413 chỉ bỏ qua **request đó**, không đánh dấu model hỏng; đồng thời cắt bớt độ dài mỗi điều luật trước khi ghép prompt.
+
+**Câu hỏi thường gặp**:
+- *"Cỡ mẫu 187/250 có đủ tin cậy không?"* — 74.8% dev set gốc, đây là **giới hạn cứng của free-tier Groq** (đã kiểm chứng qua 3 lần pull độc lập, không phải lỗi code còn sót) — đủ lớn để rút kết luận có ý nghĩa cho một đồ án cuối kỳ; chi tiết kiểm chứng chất lượng dữ liệu ở `RESULTS_ANALYSIS.md` §2.
+- *"Vì sao Self-RAG Support/Usefulness reuse từ Notebook 03 mà không chấm lại?"* — Tiết kiệm API call có chủ đích (đã giải thích ở trên) — không phải vì thiếu thời gian implement.
+- *"`*_rate` và `*_score` khác nhau chỗ nào, dùng cái nào cho báo cáo?"* — `rate` chỉ đếm tỷ lệ đạt nhãn cao nhất tuyệt đối (nghiêm khắc), `score` cho điểm một phần (1/0.5/0) nên phản ánh sắc thái tốt hơn khi phần lớn câu trả lời chỉ "một phần đúng/hỗ trợ/hữu ích" — nên trình bày cả 2 trong báo cáo, `score` phù hợp hơn để so sánh xu hướng tổng thể.
+- *"Ablation chỉ làm trên `[ISREL]`, còn 3 token kia (`[Retrieve]`, `[ISSUP]`, `[ISUSE]`) có đánh giá không?"* — Có, bổ sung ở `RESULTS_ANALYSIS.md` §6, tính hoàn toàn từ dữ liệu 187/202 sẵn có (không cần chạy lại notebook nào): (1) `[Retrieve]` — nhóm 9 câu tự quyết định `NO_RETRIEVE` có Correctness thấp hơn cả khi ép Standard RAG truy xuất trên đúng 9 câu đó (0% vs 11.1%) — cho thấy module này đôi khi bỏ qua truy xuất quá tay, dù n=9 rất nhỏ; (2) `[ISSUP]` và `[ISUSE]` đối chiếu với `Correctness` chấm độc lập ở Notebook 04 đều cho xu hướng đơn điệu đúng hướng (nhãn tốt hơn ↔ Correctness cao hơn) — chứng minh 2 module này là tín hiệu dự đoán thật, không phải nhãn ngẫu nhiên; hạn chế đi kèm: 17.9% câu được `[ISUSE]` gắn nhãn USEFUL vẫn `INCORRECT`, tức module này đo "nghe có vẻ hữu ích" nhiều hơn "đúng sự thật". **Ngoài bảng số (định lượng), §6 còn có phân tích định tính đọc trực tiếp từng câu trả lời thật** (qid cụ thể: 4000, 14790, 11746 cho `[Retrieve]`; 15, 3099 cho `[ISSUP]`; 1227, 2997, 4769 cho `[ISUSE]`) — phát hiện chung: cả 3 module đều có xu hướng chấm dựa trên **hình thức trình bày** (tự tin, mạch lạc, đủ chi tiết, có trích dẫn) nhiều hơn **nội dung đúng/sai thực chất**, ví dụ rõ nhất là câu từ chối an toàn "không đủ căn cứ" vẫn được `[ISSUP]` chấm FULLY_SUPPORTED dù sai (qid 15), và câu trả lời sai nhưng tự tin vẫn được `[ISUSE]` chấm USEFUL (qid 1227). Nên trình bày cả 2 lớp bằng chứng này trong báo cáo — bảng số cho biết "có ý nghĩa hay không", ví dụ định tính giải thích "vì sao/cơ chế nào".
+
+## 9. Trạng thái hiện tại
 
 - [x] Dataset đã verify, hiểu rõ schema (`train.json` có nhãn thật, `public_test`/`private_test` nhãn ẩn).
 - [x] `01_retrieval_baseline.ipynb` — chunking, embedding, FAISS index, Recall@k/Precision@k/MRR trên dev set (đã chạy).
 - [x] `02_generator_baseline.ipynb` — baseline RAG generator qua Groq API (đổi từ Gemini vì Gemini bắt setup billing; model tự dò qua `client.models.list()`, ưu tiên `openai/gpt-oss-120b`, tự xoay vòng khi bị khóa quota dài hạn), checkpoint JSONL resume-safe → `standard_rag_results.jsonl`.
 - [x] `03_self_rag_pipeline.ipynb` — 4 module reflection (Retrieve-decision, ISREL batch, ISSUP, ISUSE), sinh `self_rag_results.jsonl`.
-- [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`. Đã vá 3 lỗi riêng biệt (xem `RESULTS_ANALYSIS.md` §7): lỗi `<think>` (26/08/2026), lỗi dừng sớm khi judge bị mặc định hàng loạt (07/09/2026), và lỗi 413 "Request too large" bị hiểu nhầm thành hết quota (07/09/2026). **Lần pull 09/09/2026 (187/250 câu) là lần đầu tiên dữ liệu Correctness/Support/Usefulness đáng tin cậy — đã kiểm chứng chất lượng, dùng được cho báo cáo, không cần chạy lại nữa.**
-- [x] `RESULTS_ANALYSIS.md` — phân tích kết quả từ lần pull mới nhất (hiện tại: 09/09/2026, 187/250 câu, **dữ liệu cuối cùng dùng cho báo cáo**): bảng so sánh chính (Self-RAG thắng cả 3 chỉ số Correctness/Support/Usefulness), số liệu retrieval + ablation `[ISREL]` (tái hiện nhất quán qua 3 lần pull độc lập), phát hiện nghịch lý Usefulness của Standard RAG (thấp hơn cả No-RAG do hay từ chối trả lời), case study cụ thể với `_reason` thật của judge, mapping vào khung báo cáo §28. **Tài liệu này được viết lại (không phải nối thêm) mỗi lần có pull artifacts mới — luôn đọc lại bản mới nhất, đừng giả định số mục §... giữ nguyên giữa các lần.**
+- [x] `04_evaluation_report.ipynb` — sinh Hệ No-RAG, chấm Correctness/Support/Usefulness thống nhất cho cả 3 hệ trên phần giao nhau đã chạy xong, xuất `final_comparison_table.csv`. Đã vá 3 lỗi riêng biệt (xem `RESULTS_ANALYSIS.md` §8): lỗi `<think>` (26/08/2026), lỗi dừng sớm khi judge bị mặc định hàng loạt (07/09/2026), và lỗi 413 "Request too large" bị hiểu nhầm thành hết quota (07/09/2026). **Lần pull 09/09/2026 (187/250 câu) là lần đầu tiên dữ liệu Correctness/Support/Usefulness đáng tin cậy — đã kiểm chứng chất lượng, dùng được cho báo cáo, không cần chạy lại nữa.**
+- [x] `RESULTS_ANALYSIS.md` — phân tích kết quả từ lần pull mới nhất (hiện tại: 09/09/2026, 187/250 câu, **dữ liệu cuối cùng dùng cho báo cáo**): bảng so sánh chính (Self-RAG thắng cả 3 chỉ số Correctness/Support/Usefulness), số liệu retrieval, **ablation đầy đủ trên cả 4 token phản tư ở §6** (bổ sung 13/09/2026: `[Retrieve]` — 9 câu NO_RETRIEVE thua cả Standard RAG bị ép truy xuất; `[ISREL]`→`[ISSUP]` — tái hiện nhất quán qua 3 lần pull độc lập, 39%→90%; `[ISSUP]`/`[ISUSE]` → Correctness — cả 2 đơn điệu đúng hướng, nhưng `[ISUSE]` có 17.9% nhãn USEFUL vẫn sai), phát hiện nghịch lý Usefulness của Standard RAG (thấp hơn cả No-RAG do hay từ chối trả lời), case study cụ thể với `_reason` thật của judge, mapping vào khung báo cáo §28. **Tài liệu này được viết lại (không phải nối thêm) mỗi lần có pull artifacts mới — luôn đọc lại bản mới nhất, đừng giả định số mục §... giữ nguyên giữa các lần.**
 - [x] Demo — mục "11. Demo" trong `03_self_rag_pipeline.ipynb`, đặt **ngay sau Orchestrator (§10) và trước vòng lặp dev set nặng (§12)** một cách có chủ đích: muốn demo (ví dụ lúc báo cáo cuối kỳ) chỉ cần chạy notebook từ đầu tới hết §11 (Colab: chuột phải cell demo → "Run before"), không phải đợi qua vòng lặp 250 câu ở §12. Sửa `DEMO_QUESTIONS` rồi chạy lại cell là ra ngay answer + nguồn trích dẫn + reflection report.
 - [x] ~~`05_drill_submission.ipynb`~~ — **đã hủy**. Fetch trang chính thức https://vlsp.org.vn/vlsp2025/eval/drill xác nhận hạn nộp hệ thống là **12/08/2025 23:59 UTC** (nộp qua Codabench, chấm bằng Recall/Precision/Macro-F2) — đã qua hơn 1 năm tính đến thời điểm làm đồ án này, không còn đường nộp thật. Quyết định (do người dùng chọn): dừng hẳn, không build notebook dự đoán trên `public_test.json`/`private_test.json` nữa, tập trung thời gian còn lại cho báo cáo/slide.
 - [ ] Báo cáo + slide (tái sử dụng nội dung từ `seminar/SELF_RAG_SEMINAR_DETAILED_GUIDE.md` cho phần liên quan tới paper gốc).
